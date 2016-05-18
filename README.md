@@ -17,6 +17,7 @@ I use the 'Airline Twitter sentiment' dataset obtained at the URL below. To find
 https://www.crowdflower.com/data-for-everyone/
 
 Specifically, I use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower.
+I assume the upload date is incorrect as the data includes tweets from after 2/12/2015...
 Note that the actual dataset only appears to contain 14,640 rows.
 I'm not sure where the discrepancy between actual rows and rows stated on the website comes from, but it doesn't affect my analysis.
 This dataset is a scrape of Twitter of data from a portion of February 2015.
