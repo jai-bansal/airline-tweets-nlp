@@ -13,7 +13,7 @@ TO BE FILLED IN
 ***
 
 #### Dataset Details:
-I use the 'Airline Twitter sentiment' dataset obtained at the URL below:
+I use the 'Airline Twitter sentiment' dataset obtained at the URL below. To find the dataset, search for 'Airline'
 https://www.crowdflower.com/data-for-everyone/
 
 Specifically, I use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower.
