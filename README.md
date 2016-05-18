@@ -1,5 +1,5 @@
 #### Synopsis:
-This project conducts analysis, natural language processing (NLP), and machine learning on Twitter airline tweets from February 2015 in R and Python.
+This project conducts analysis, natural language processing (NLP), and machine learning on Twitter airline tweets from a portion of February 2015 in R and Python.
 
 #### Motivation:
 I wrote this project mainly to experiment and learn about NLP in R and Python.
@@ -19,7 +19,7 @@ https://www.crowdflower.com/data-for-everyone/
 Specifically, I use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower.
 Note that the actual dataset only appears to contain 14,640 rows.
 I'm not sure where the discrepancy between actual rows and rows stated on the website comes from, but it doesn't affect my analysis.
-This dataset is a scrape of Twitter of data from February 2015.
+This dataset is a scrape of Twitter of data from a portion of February 2015.
 The tweets that were included were about major US airlines.
 Contributors were asked to classify positive, negative, and neutral tweets, followed by categorizing negative reasons (such as "late flight" or "rude service").
 The tweet classification provides 'answers' for sentiment analysis, allowing me to conduct more interesting analysis and prediction.
