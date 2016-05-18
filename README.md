@@ -17,6 +17,8 @@ I use the 'Airline Twitter sentiment' dataset obtained at the URL below:
 https://www.crowdflower.com/data-for-everyone/
 
 Specifically, I use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower.
+Note that the actual dataset only appears to contain 14,640 rows.
+I'm not sure where the discrepancy between actual rows and rows stated on the website comes from, but it doesn't affect my analysis.
 This dataset is a scrape of Twitter of data from February 2015.
 The tweets that were included were about major US airlines.
 Contributors were asked to classify positive, negative, and neutral tweets, followed by categorizing negative reasons (such as "late flight" or "rude service").
