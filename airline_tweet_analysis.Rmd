@@ -2,7 +2,7 @@
 title: "Airline Tweet NLP"
 author: "Jai Bansal"
 date: "May 18, 2016"
-output: html_document
+output: word_document
 ---
 
 This document conducts natural language processing (NLP) analysis on Twitter tweets about major US airlines scraped from the site during part of February 2015.  
