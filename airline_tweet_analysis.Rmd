@@ -1,108 +1,70 @@
 ---
-title: "Airline Tweet Analysis"
+title: "Airline Tweet NLP"
 author: "Jai Bansal"
 date: "May 18, 2016"
 output: html_document
 ---
 
-This document conducts analysis, natural language processing, and machine learning on Twitter tweets about major US airlines scraped from the site during a portion of February 2015.
+This document conducts natural language processing (NLP) analysis on Twitter tweets about major US airlines scraped from the site during part of February 2015.  
 Contributors were asked to classify positive, negative, and neutral tweets, followed by categorizing negative reasons (such as "late flight" or "rude service").
 Thus, for each tweet, I have the 'correct' answer for sentiment analysis purposes.
 
-The data can be found at the URL below. To find the dataset, search for 'Airline' on the page. 
-I specifically use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower. 
-I assume the upload date is incorrect as the data includes tweets from after 2/12/2015...
+The data can be found at the URL below. To find the dataset, search for 'Airline' on the page.  
+I specifically use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower.  
+I assume the upload date is incorrect as the data includes tweets from after 2/12/2015...  
 
 https://www.crowdflower.com/data-for-everyone/
 
 Note that the actual dataset only appears to contain 14,640 rows. I'm not sure where the discrepancy between actual rows and rows stated on the website comes from, but it doesn't affect my analysis.
 
-```{r prep_and_import, include = F, echo = F}
+```{r import_and_prep, include = F, echo = F}
   
   # Load packages.
   library(data.table)
-  library(ggplot2)
+  library(tm)
+  library(SnowballC)
+  library(wordcloud)
 
   # Import data.
   tweet_data = data.table(read.csv('Airline-Sentiment-2-w-AA.csv', 
                                   header = T, 
                                   stringsAsFactors = F))
   
-  # Create 'timestamp' column from 'tweet_created'.
-  tweet_data$timestamp = as.POSIXct(tweet_data$tweet_created, 
-                                    format = '%m/%d/%y %H:%M')
-  
-  # Change 'airline_sentiment' so that values are 'Positive', 'Negative', and 'Neutral' instead of 'positive', 'negative', and 'neutral'.
-  tweet_data$airline_sentiment = ifelse(tweet_data$airline_sentiment == 'positive', 
-                                        'Positive', 
-                                        tweet_data$airline_sentiment)
-  tweet_data$airline_sentiment = ifelse(tweet_data$airline_sentiment == 'negative', 
-                                        'Negative', 
-                                        tweet_data$airline_sentiment)
-  tweet_data$airline_sentiment = ifelse(tweet_data$airline_sentiment == 'neutral', 
-                                        'Neutral', 
-                                        tweet_data$airline_sentiment)
-  
-  # Change 'negativereason' so it looks nicer for plotting.
-  tweet_data$negativereason = ifelse(tweet_data$negativereason == 'longlines', 
-                                     'Long Lines', 
-                                     tweet_data$negativereason)
+  # Change tweet text to all lowercase.
+  tweet_data$text = tolower(tweet_data$text)
   
 ```
 
-### Summary Statistics:
+### Word Cloud:
 
-* Number of Tweets: `r nrow(tweet_data)`
-* Number of Users: `r length(unique(tweet_data$name))`
-* Average Tweets per User: `r round(nrow(tweet_data) / length(unique(tweet_data$name)), 2)`
-* Number of Airlines: `r length(unique(tweet_data$airline))`
-* First Tweet Timestamp: `r min(tweet_data$timestamp)`
-* Last Tweet Timestamp: `r max(tweet_data$timestamp)`
-* Tweet Sentiment Categories: `r unique(tweet_data$airline_sentiment)`
-* Airlines: `r unique(tweet_data$airline)`
+Below is a word cloud with the 50 most frequently used words (technically stems) in the tweet data. 
+The larger and darker a word, the more frequently it was used.
 
-### Tweets by Airline:
-
-```{r tweets_by_airline, include = T, echo = F}
-
-  # Create plot of tweets broken down by airline and sentiment.
-  ggplot(data = tweet_data, 
-         aes(x = airline, 
-             fill = airline_sentiment)) +
-    geom_bar() +
-    xlab('Airline') +
-    ylab('Number of Tweets') +
-    theme(axis.text.x = element_text(color = 'black', 
-                                   size = 10,
-                                   angle = 90), 
-      axis.text.y = element_text(color = 'black', 
-                                   size = 11), 
-      axis.title.x = element_text(size = 13, 
-                                  face = 'bold'),
-      axis.title.y = element_text(size = 13,
-                                  face = 'bold'),
-      axis.ticks = element_blank(),
-      plot.title = element_text(face = 'bold', 
-                                size = 13), 
-      legend.title = element_text(size = 9), 
-      legend.text = element_text(size = 9)) + 
-    guides(fill = guide_legend(title = 'Tweet Sentiment'))
+```{r word_cloud, include = T, echo = F}
+  
+  # Create corpus of tweet data ('tweet_data$text').
+  tweet_corpus = Corpus(VectorSource(tweet_data$text))
+  
+  # Remove punctuation from 'tweet_corpus'.
+  tweet_corpus = tm_map(tweet_corpus, 
+                        removePunctuation)
+  
+  # Remove (English) stopwords and airline names from 'tweet_corpus'.
+  # I want to exclude airline names in the word cloud and at least one airline name is likely to be in every tweet.
+  tweet_corpus = tm_map(tweet_corpus, 
+                        removeWords,
+                        c('virginamerica', 'united', 'southwestair', 'jetblue', 'usairways', 'americanair', 
+                          stopwords('english')))
+  
+  # Perform stemming on 'tweet_corpus'.
+  tweet_corpus = tm_map(tweet_corpus, 
+                        stemDocument)
+  
+  # Plot wordcloud.
+  wordcloud(tweet_corpus,
+            max.words = 50,
+            random.order = F, 
+            colors = c('lightskyblue', 'cornflowerblue', 'blue', 'blue4'))
   
 ```
-
- ggplot(data = seasons_reshape, 
-           aes(x = variable, 
-               y = value, 
-               group = Team,
-               color = Team)) +
-      geom_line() +
-      geom_point() +
-      ylim(c(0, 100)) +
-      ggtitle('Win Percentage of Selected Teams') +
-      xlab('Season') +
-      ylab('Win Percentage') +
-      , 
-      legend.title = element_text(size = 12),
-      legend.text = element_text(size = 12)) +
-      labs(fill = 'Tweet Sentiment')
 
