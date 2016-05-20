@@ -1,5 +1,5 @@
 #### Synopsis:
-This project conducts natural language processing (NLP) analysis on Twitter airline tweets from part of February 2015 in R and Python.
+This project conducts basic natural language processing (NLP) analysis on Twitter airline tweets from part of February 2015 in R and Python.
 
 #### Motivation:
 I wrote this project to experiment and learn about NLP in R and Python.
