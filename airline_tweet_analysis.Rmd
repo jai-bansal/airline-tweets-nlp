@@ -24,6 +24,7 @@ Note that the actual dataset only appears to contain 14,640 rows. I'm not sure w
   library(tm)
   library(SnowballC)
   library(wordcloud)
+  library(tm.plugin.sentiment)
 
   # Import data.
   tweet_data = data.table(read.csv('Airline-Sentiment-2-w-AA.csv', 
@@ -46,25 +47,86 @@ The larger and darker a word, the more frequently it was used.
   tweet_corpus = Corpus(VectorSource(tweet_data$text))
   
   # Remove punctuation from 'tweet_corpus'.
-  tweet_corpus = tm_map(tweet_corpus, 
-                        removePunctuation)
+  wordcloud_tweet_corpus = tm_map(tweet_corpus, 
+                                  removePunctuation)
   
   # Remove (English) stopwords and airline names from 'tweet_corpus'.
   # I want to exclude airline names in the word cloud and at least one airline name is likely to be in every tweet.
-  tweet_corpus = tm_map(tweet_corpus, 
-                        removeWords,
-                        c('virginamerica', 'united', 'southwestair', 'jetblue', 'usairways', 'americanair', 
-                          stopwords('english')))
+  wordcloud_tweet_corpus = tm_map(wordcloud_tweet_corpus, 
+                                  removeWords, 
+                                  c('virginamerica', 'united', 'southwestair', 'jetblue', 'usairways', 'americanair', 
+                                    stopwords('english')))
   
   # Perform stemming on 'tweet_corpus'.
-  tweet_corpus = tm_map(tweet_corpus, 
-                        stemDocument)
+  wordcloud_tweet_corpus = tm_map(wordcloud_tweet_corpus, 
+                                  stemDocument)
   
   # Plot wordcloud.
-  wordcloud(tweet_corpus,
+  wordcloud(wordcloud_tweet_corpus,
             max.words = 50,
             random.order = F, 
             colors = c('lightskyblue', 'cornflowerblue', 'blue', 'blue4'))
   
 ```
 
+### Sentiment Analysis:
+
+I will conduct sentiment analysis in 3 ways.  
+* Lexicon based (with pre-provided lists of positive and negative terms)   
+* Classification Model
+
+**Lexicon Based**:
+
+```{r sentiment_analysis_lexicon_based_automatic, include = T, echo = F}
+  
+  # Conduct data cleaning and compute sentiment analysis scores for 'tweet_data'.
+  # Specifically, the text cleaning that occurs is making the text lowercase, removing punctuation, 
+  # removing numbers, removing (English) stopwords, removing whitespace, stemming words, and removing words with less than 3 characters.
+  # I do this process on the unmodified 'tweet_corpus' instead of 'wordcloud_tweet_corpus' which has already been preprocessed to some extent.
+  sa_tweet_data = score(tweet_corpus)
+  
+  # Get sentiment analysis scores for each tweet.
+  # I list the score metric defintions below (found this info on slide 36: http://statmath.wu.ac.at/courses/SNLP/Presentations/DA-Sentiment.pdf)
+  # In these definitions, N is the total number of words in a document and p[n] is the number of positive[negative] words in a document.
+  # Positive and negative words are included in a pre-defined list called 'dic_gi'.
+  # There are 5 score metrics computed:
+  # polarity = (p - n) / (p + n)
+  # subjectivity = (n + p) / N
+  # pos_refs_per_ref = p / N
+  # neg_refs_per_ref = n / N
+  # senti_diffs_per_ref = (p - n) / N
+  sa_tweet_data = meta(sa_tweet_data)
+  sa_tweet_data = data.table(sa_tweet_data)
+  
+  # Add 'sa_tweet_data$polarity' to 'tweet_data'.
+  tweet_data$polarity = sa_tweet_data$polarity
+  
+  # Translate polarity into a 'predicted_sentiment'.
+  # If 'polarity' is less[greater] than 0, the tweet will be predicted to have negative[positive] sentiment.
+  # If 'polarity' is 0, the tweet will be predicted to have neutral sentiment.
+  tweet_data$predicted_sentiment = ifelse(tweet_data$polarity < 0, 'negative', 
+                                          ifelse(tweet_data$polarity == 0, 'neutral', 'positive'))
+  
+```
+
+In this section, I use a function that automatically preprocesses the data and computes various scoring metrics.  
+The preprocessing that is done includes making the text lowercase, removing punctuation, removing numbers, removing (English) stopwords, removing whitespace, stemming words, and removing words with less than 3 characters.  
+The scoring metric I will consider is polarity and is computed as: (p - n) / (p + n)  
+p[n] is the number of positive[negative] words in a tweet. These positive and negative words come in a pre-defined list.
+
+For each tweet, if polarity is less[greater] than 0, the tweet will be predicted to have negative[positive] sentiment.  
+Tweets will a polarity of 0 will be predicted to be neutral.
+
+Using these definitions, `r nrow(tweet_data[airline_sentiment == predicted_sentiment])` out of `r nrow(tweet_data)` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment]) / nrow(tweet_data), 2)`)% of tweets are predicted correctly.
+
+Broken down by category:   
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'positive'])` out of `r nrow(tweet_data[airline_sentiment == 'positive'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'positive']) / nrow(tweet_data[airline_sentiment == 'positive']), 2)`)% of positive tweets are predicted correctly.
+
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'neutral'])` out of `r nrow(tweet_data[airline_sentiment == 'neutral'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'neutral']) / nrow(tweet_data[airline_sentiment == 'neutral']), 2)`)% of neutral tweets are predicted correctly.
+
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'negative'])` out of `r nrow(tweet_data[airline_sentiment == 'negative'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'negative']) / nrow(tweet_data[airline_sentiment == 'negative']), 2)`)% of negative tweets are predicted correctly.
+
+**Classification Model**:
+
+```{r sentiment_analysis_classification_model, include = T, echo = F}
+```
