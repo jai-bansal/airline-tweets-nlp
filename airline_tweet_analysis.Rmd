@@ -5,7 +5,7 @@ date: "May 18, 2016"
 output: word_document
 ---
 
-This document conducts natural language processing (NLP) analysis on Twitter tweets about major US airlines scraped from the site during part of February 2015.  
+This document conducts basic natural language processing (NLP) analysis on Twitter tweets about major US airlines scraped from the site during part of February 2015.  
 Contributors were asked to classify positive, negative, and neutral tweets, followed by categorizing negative reasons (such as "late flight" or "rude service").
 Thus, for each tweet, I have the 'correct' answer for sentiment analysis purposes.
 
@@ -25,6 +25,7 @@ Note that the actual dataset only appears to contain 14,640 rows. I'm not sure w
   library(SnowballC)
   library(wordcloud)
   library(tm.plugin.sentiment)
+  library(e1071)
 
   # Import data.
   tweet_data = data.table(read.csv('Airline-Sentiment-2-w-AA.csv', 
@@ -71,13 +72,13 @@ The larger and darker a word, the more frequently it was used.
 
 ### Sentiment Analysis:
 
-I will conduct sentiment analysis in 3 ways.  
+I will conduct sentiment analysis in 2 ways.  
 * Lexicon based (with pre-provided lists of positive and negative terms)   
-* Classification Model
+* Naive Bayes Classification Model
 
 **Lexicon Based**:
 
-```{r sentiment_analysis_lexicon_based_automatic, include = T, echo = F}
+```{r sentiment_analysis_lexicon_based, include = T, echo = F}
   
   # Conduct data cleaning and compute sentiment analysis scores for 'tweet_data'.
   # Specifically, the text cleaning that occurs is making the text lowercase, removing punctuation, 
@@ -101,10 +102,10 @@ I will conduct sentiment analysis in 3 ways.
   # Add 'sa_tweet_data$polarity' to 'tweet_data'.
   tweet_data$polarity = sa_tweet_data$polarity
   
-  # Translate polarity into a 'predicted_sentiment'.
+  # Translate polarity into a 'predicted_sentiment_lexicon_based'.
   # If 'polarity' is less[greater] than 0, the tweet will be predicted to have negative[positive] sentiment.
   # If 'polarity' is 0, the tweet will be predicted to have neutral sentiment.
-  tweet_data$predicted_sentiment = ifelse(tweet_data$polarity < 0, 'negative', 
+  tweet_data$predicted_sentiment_lexicon_based = ifelse(tweet_data$polarity < 0, 'negative', 
                                           ifelse(tweet_data$polarity == 0, 'neutral', 'positive'))
   
 ```
@@ -117,16 +118,24 @@ p[n] is the number of positive[negative] words in a tweet. These positive and ne
 For each tweet, if polarity is less[greater] than 0, the tweet will be predicted to have negative[positive] sentiment.  
 Tweets will a polarity of 0 will be predicted to be neutral.
 
-Using these definitions, `r nrow(tweet_data[airline_sentiment == predicted_sentiment])` out of `r nrow(tweet_data)` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment]) / nrow(tweet_data), 2)`)% of tweets are predicted correctly.
+Using these definitions, `r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based])` out of `r nrow(tweet_data)` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based]) / nrow(tweet_data), 2)`)% of tweets are predicted correctly.
 
 Broken down by category:   
-`r nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'positive'])` out of `r nrow(tweet_data[airline_sentiment == 'positive'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'positive']) / nrow(tweet_data[airline_sentiment == 'positive']), 2)`)% of positive tweets are predicted correctly.
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'positive'])` out of `r nrow(tweet_data[airline_sentiment == 'positive'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'positive']) / nrow(tweet_data[airline_sentiment == 'positive']), 2)`)% of positive tweets are predicted correctly.
 
-`r nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'neutral'])` out of `r nrow(tweet_data[airline_sentiment == 'neutral'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'neutral']) / nrow(tweet_data[airline_sentiment == 'neutral']), 2)`)% of neutral tweets are predicted correctly.
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'neutral'])` out of `r nrow(tweet_data[airline_sentiment == 'neutral'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'neutral']) / nrow(tweet_data[airline_sentiment == 'neutral']), 2)`)% of neutral tweets are predicted correctly.
 
-`r nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'negative'])` out of `r nrow(tweet_data[airline_sentiment == 'negative'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment & airline_sentiment == 'negative']) / nrow(tweet_data[airline_sentiment == 'negative']), 2)`)% of negative tweets are predicted correctly.
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'negative'])` out of `r nrow(tweet_data[airline_sentiment == 'negative'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'negative']) / nrow(tweet_data[airline_sentiment == 'negative']), 2)`)% of negative tweets are predicted correctly.
 
-**Classification Model**:
+Further Exploration:  
 
-```{r sentiment_analysis_classification_model, include = T, echo = F}
+These results are not great. Results might be improved by using a different (possibly custom) list of positively and negatively associated words. Since these tweets are directed at airlines, the lists should probably include air travel specific terms. Results might also improve by using different polarity cutoffs. Perhaps tweets with scores that are slightly above/below zero should be classifed as neutral. Or maybe tweets with a slightly negative polarity should be classified as positive. There are many variations to explore here. Finally, a different scoring metric might yield better results.
+
+**Naive Bayes Classification Model**:
+
+```{r sentiment_analysis_naive_bayes, include = T, echo = F}
+  
+  
+    
 ```
+
