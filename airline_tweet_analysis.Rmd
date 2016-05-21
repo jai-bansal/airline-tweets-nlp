@@ -51,6 +51,14 @@ The larger and darker a word, the more frequently it was used.
   wordcloud_tweet_corpus = tm_map(tweet_corpus, 
                                   removePunctuation)
   
+  # Remove extra whitespace from 'tweet_corpus'.
+  wordcloud_tweet_corpus = tm_map(tweet_corpus, 
+                                  stripWhitespace)
+  
+  # Remove numbers from 'tweet_corpus'.
+  wordcloud_tweet_corpus = tm_map(tweet_corpus, 
+                                  removeNumbers)
+  
   # Remove (English) stopwords and airline names from 'tweet_corpus'.
   # I want to exclude airline names in the word cloud and at least one airline name is likely to be in every tweet.
   wordcloud_tweet_corpus = tm_map(wordcloud_tweet_corpus, 
@@ -134,6 +142,17 @@ These results are not great. Results might be improved by using a different (pos
 **Naive Bayes Classification Model**:
 
 ```{r sentiment_analysis_naive_bayes, include = T, echo = F}
+  
+  # Create Term Document Matrix.
+  # I do this from 'wordcloud_tweet_corpus' as this corpus already has the pre-processing/cleaning I want.
+  tweet_tdm = as.matrix(DocumentTermMatrix(wordcloud_tweet_corpus))
+  
+  # Compute the sums of each column of 'tweet_tdm'.
+  # This tells me how often each term is used.
+  sums = colSums(tweet_tdm)
+  
+  # Get the relative order of the values in 'sums'.
+  ordered = order(sums)
   
   
     
