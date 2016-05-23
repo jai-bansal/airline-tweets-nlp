@@ -26,6 +26,7 @@ Note that the actual dataset only appears to contain 14,640 rows. I'm not sure w
   library(wordcloud)
   library(tm.plugin.sentiment)
   library(e1071)
+  library(FSelector)
 
   # Import data.
   tweet_data = data.table(read.csv('Airline-Sentiment-2-w-AA.csv', 
@@ -52,11 +53,11 @@ The larger and darker a word, the more frequently it was used.
                                   removePunctuation)
   
   # Remove extra whitespace from 'tweet_corpus'.
-  wordcloud_tweet_corpus = tm_map(tweet_corpus, 
+  wordcloud_tweet_corpus = tm_map(wordcloud_tweet_corpus, 
                                   stripWhitespace)
   
   # Remove numbers from 'tweet_corpus'.
-  wordcloud_tweet_corpus = tm_map(tweet_corpus, 
+  wordcloud_tweet_corpus = tm_map(wordcloud_tweet_corpus, 
                                   removeNumbers)
   
   # Remove (English) stopwords and airline names from 'tweet_corpus'.
@@ -143,9 +144,48 @@ These results are not great. Results might be improved by using a different (pos
 
 ```{r sentiment_analysis_naive_bayes, include = T, echo = F}
   
-  # Create Term Document Matrix.
+  # Create Document Term Matrix.
   # I do this from 'wordcloud_tweet_corpus' as this corpus already has the pre-processing/cleaning I want.
-  tweet_tdm = as.matrix(DocumentTermMatrix(wordcloud_tweet_corpus))
+  # I impose word length and term frequency bounds on the terms in the document term matrix.
+  tweet_tdm = as.matrix(DocumentTermMatrix(wordcloud_tweet_corpus, 
+                                           control = list(wordLengths = c(3, nrow(tweet_data)), 
+                                           bounds = list(global = c(5, nrow(tweet_data))))))
+  
+  # Turn 'tweet_tdm' into a 'data.table'.
+  tweet_tdm = as.data.frame(tweet_tdm)
+  
+  # Add true sentiment analysis classifications to 'tweet_tdm'.
+  tweet_tdm$airline_sentiment = tweet_data$airline_sentiment
+  
+  # Create training and test sets from 'tweet_tdm'.
+  # Both training and test sets contain approximately half of the data.
+  
+    # Set seed and randomly sample the row numbers for the training set.
+    set.seed(1)
+    training_rows = sample(1:nrow(tweet_data), 
+                           nrow(tweet_data) / 2, 
+                           replace = F)
+  
+    # Create training and test sets.
+    tweet_tdm_train = tweet_tdm[training_rows, ]
+    tweet_tdm_test = tweet_tdm[(-training_rows), ]
+    
+  # Do feature selection.
+    
+    # Compute feature importance using information gain on training data.
+    train_feature_importance = information.gain(airline_sentiment ~., 
+                         data = tweet_tdm_train)
+    
+    # Limit 'train_feature_importance' to only include features with an importance greater than 0.
+    train_feature_importance = subset(train_feature_importance, 
+                                      attr_importance > 0)
+    
+    # Limit training and test sets to only include relevant variables in 'train_feature_importance'.
+    
+    
+  # test
+  model = naiveBayes(formula = airline_sentiment ~., 
+                     data = test)
   
   # Compute the sums of each column of 'tweet_tdm'.
   # This tells me how often each term is used.
