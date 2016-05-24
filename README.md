@@ -1,5 +1,5 @@
 #### Synopsis:
-This project conducts basic natural language processing (NLP) analysis on Twitter airline tweets from part of February 2015 in R and Python.
+This project conducts basic natural language processing (NLP) analysis on Twitter airline tweets from part of February 2015 in R and Python. Specifically, I create a word cloud and create 2 sentiment analysis models.
 
 #### Motivation:
 I wrote this project to experiment and learn about NLP in R and Python.
@@ -8,6 +8,10 @@ I wrote this project to experiment and learn about NLP in R and Python.
 The R and Python analyses are located in the 'R' and 'Python' branches respectively. <br />
 The dataset ('Airline-Sentiment-2-w-AA.csv') is included in both branches.
 
+The R branch includes the RMarkdown script containing the analysis ('airline_tweet_analysis.Rmd'). <br />
+It also contains a PDF file ('airline_tweet_analysis.pdf') that is the product (with some intermediate editing) of running the RMarkdown script.
+
+The Python branch...
 ***
 TO BE FILLED IN
 ***
