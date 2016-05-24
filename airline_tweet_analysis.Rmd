@@ -180,21 +180,51 @@ These results are not great. Results might be improved by using a different (pos
     train_feature_importance = subset(train_feature_importance, 
                                       attr_importance > 0)
     
-    # Limit training and test sets to only include relevant variables in 'train_feature_importance'.
+    # The relevant features are contained in the row names of 'train_feature_importance', which I name 'relevant_features'.
+    # The first entry of 'train_feature_importance' has some special characters which somehow made it through to this point.
+    # This entry wreaks havoc and so I remove it.
+    # I also add 'airline_sentiment' to 'relevant_features', because these answers are necessary for model building.
+    relevant_features = c(row.names(train_feature_importance)[2:length(row.names(train_feature_importance))], 'airline_sentiment')
     
+    # Limit training and test data sets to the relevant columns/features.
+    # Note that I calculated feature importance on the training set only and used the most important features in both the test and training set.
+    tweet_tdm_train = tweet_tdm_train[, relevant_features]
+    tweet_tdm_test = tweet_tdm_test[, relevant_features]
     
-  # test
-  model = naiveBayes(formula = airline_sentiment ~., 
-                     data = test)
-  
-  # Compute the sums of each column of 'tweet_tdm'.
-  # This tells me how often each term is used.
-  sums = colSums(tweet_tdm)
-  
-  # Get the relative order of the values in 'sums'.
-  ordered = order(sums)
-  
-  
+  # Change 'airline_sentiment' to factor for training and test data to allow model to run.  
+  tweet_tdm_train$airline_sentiment = as.factor(tweet_tdm_train$airline_sentiment)
+  tweet_tdm_test$airline_sentiment = as.factor(tweet_tdm_test$airline_sentiment)
     
+  # Create model on training data.
+  naive_bayes_model = naiveBayes(formula = airline_sentiment ~., 
+                                 data = tweet_tdm_train)
+    
+  # Predict values for training and test sets.
+  training_pred = predict(naive_bayes_model, 
+                             newdata = tweet_tdm_train, 
+                             type = 'class')
+  test_pred = predict(naive_bayes_model, 
+                      newdata = tweet_tdm_test, 
+                      type = 'class')
+  
+  # Add predictions to training and test sets.
+  tweet_tdm_train$pred = training_pred
+  tweet_tdm_test$pred = test_pred
+  
+  # Change training and test set to 'data.table' to help communication of results below.
+  tweet_tdm_train = as.data.table(tweet_tdm_train)
+  tweet_tdm_test = as.data.table(tweet_tdm_test)
+  
+  # Compute cross validation error.
+  t = tune(method = 'naiveBayes', 
+           airline_sentiment ~., 
+           data = tweet_tdm_train, 
+           size = 5)
+  
 ```
 
+The training error is `r round(nrow(tweet_tdm_train[airline_sentiment != pred]) / nrow(tweet_tdm_train), 2)`.
+`r t`
+The test error is `r round(nrow(tweet_tdm_test[airline_sentiment != pred]) / nrow(tweet_tdm_test), 2)`.
+
+These results, while 
