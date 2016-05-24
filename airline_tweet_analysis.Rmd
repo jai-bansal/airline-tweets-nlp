@@ -1,21 +1,22 @@
 ---
-title: "Airline Tweet NLP"
+title: "Airline Tweets NLP"
 author: "Jai Bansal"
-date: "May 18, 2016"
+date: "May 24, 2016"
 output: word_document
 ---
 
-This document conducts basic natural language processing (NLP) analysis on Twitter tweets about major US airlines scraped from the site during part of February 2015.  
-Contributors were asked to classify positive, negative, and neutral tweets, followed by categorizing negative reasons (such as "late flight" or "rude service").
+This document shows the results of basic natural language processing (NLP) analysis on Twitter tweets about major US airlines scraped from the site during part of February 2015. Specifically, I create a word cloud and conduct sentiment analysis.
+
+Contributors to the data set were asked to classify positive, negative, and neutral tweets.
 Thus, for each tweet, I have the 'correct' answer for sentiment analysis purposes.
 
 The data can be found at the URL below. To find the dataset, search for 'Airline' on the page.  
 I specifically use the 16,000 row dataset uploaded on February 12, 2015 by CrowdFlower.  
-I assume the upload date is incorrect as the data includes tweets from after 2/12/2015...  
+I assume the upload date is incorrect as the data includes tweets from after 2/12/2015...
 
 https://www.crowdflower.com/data-for-everyone/
 
-Note that the actual dataset only appears to contain 14,640 rows. I'm not sure where the discrepancy between actual rows and rows stated on the website comes from, but it doesn't affect my analysis.
+Note that the actual dataset only contains 14,640 rows. I'm not sure where the discrepancy comes from, but it doesn't affect the analysis.
 
 ```{r import_and_prep, include = F, echo = F}
   
@@ -35,6 +36,9 @@ Note that the actual dataset only appears to contain 14,640 rows. I'm not sure w
   
   # Change tweet text to all lowercase.
   tweet_data$text = tolower(tweet_data$text)
+  
+  # Only include needed columns.
+  tweet_data = tweet_data[, .(airline_sentiment, text)]
   
 ```
 
@@ -81,7 +85,7 @@ The larger and darker a word, the more frequently it was used.
 
 ### Sentiment Analysis:
 
-I will conduct sentiment analysis in 2 ways.  
+I conduct sentiment analysis in 2 ways:  
 * Lexicon based (with pre-provided lists of positive and negative terms)   
 * Naive Bayes Classification Model
 
@@ -119,26 +123,26 @@ I will conduct sentiment analysis in 2 ways.
   
 ```
 
-In this section, I use a function that automatically preprocesses the data and computes various scoring metrics.  
-The preprocessing that is done includes making the text lowercase, removing punctuation, removing numbers, removing (English) stopwords, removing whitespace, stemming words, and removing words with less than 3 characters.  
-The scoring metric I will consider is polarity and is computed as: (p - n) / (p + n)  
+Before modeling, I make the text lowercase, remove punctuation, remove numbers, remove (English) stopwords, remove whitespace, stem words, and remove words with less than 3 characters.   
+The scoring metric I use is polarity and is computed as: (p - n) / (p + n)
+
 p[n] is the number of positive[negative] words in a tweet. These positive and negative words come in a pre-defined list.
 
-For each tweet, if polarity is less[greater] than 0, the tweet will be predicted to have negative[positive] sentiment.  
-Tweets will a polarity of 0 will be predicted to be neutral.
+For each tweet, if polarity is less[greater] than 0, the tweet will be classified as negative[positive].   
+Tweets with a polarity of 0 are classified as neutral.
 
-Using these definitions, `r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based])` out of `r nrow(tweet_data)` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based]) / nrow(tweet_data), 2)`)% of tweets are predicted correctly.
+Using these definitions, `r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based])` out of `r nrow(tweet_data)` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based]) / nrow(tweet_data), 2)`)% of tweets are classified correctly.
 
-Broken down by category:   
-`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'positive'])` out of `r nrow(tweet_data[airline_sentiment == 'positive'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'positive']) / nrow(tweet_data[airline_sentiment == 'positive']), 2)`)% of positive tweets are predicted correctly.
+Results by tweet classification category:   
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'positive'])` out of `r nrow(tweet_data[airline_sentiment == 'positive'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'positive']) / nrow(tweet_data[airline_sentiment == 'positive']), 2)`)% of positive tweets are classified correctly.
 
-`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'neutral'])` out of `r nrow(tweet_data[airline_sentiment == 'neutral'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'neutral']) / nrow(tweet_data[airline_sentiment == 'neutral']), 2)`)% of neutral tweets are predicted correctly.
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'neutral'])` out of `r nrow(tweet_data[airline_sentiment == 'neutral'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'neutral']) / nrow(tweet_data[airline_sentiment == 'neutral']), 2)`)% of neutral tweets are classified correctly.
 
-`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'negative'])` out of `r nrow(tweet_data[airline_sentiment == 'negative'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'negative']) / nrow(tweet_data[airline_sentiment == 'negative']), 2)`)% of negative tweets are predicted correctly.
+`r nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'negative'])` out of `r nrow(tweet_data[airline_sentiment == 'negative'])` (`r round(100 * nrow(tweet_data[airline_sentiment == predicted_sentiment_lexicon_based & airline_sentiment == 'negative']) / nrow(tweet_data[airline_sentiment == 'negative']), 2)`)% of negative tweets are classified correctly.
 
 Further Exploration:  
 
-These results are not great. Results might be improved by using a different (possibly custom) list of positively and negatively associated words. Since these tweets are directed at airlines, the lists should probably include air travel specific terms. Results might also improve by using different polarity cutoffs. Perhaps tweets with scores that are slightly above/below zero should be classifed as neutral. Or maybe tweets with a slightly negative polarity should be classified as positive. There are many variations to explore here. Finally, a different scoring metric might yield better results.
+These results are not great. Results might be improved by using a different (possibly custom) list of positively and negatively associated words. Since these tweets are directed at airlines, the lists should probably include air travel specific terms. Results might also improve by using different polarity cutoffs. Perhaps tweets with scores that are slightly above/below zero should be classified as neutral. There are many variations to explore here. Finally, a different scoring metric might yield better results.
 
 **Naive Bayes Classification Model**:
 
@@ -197,7 +201,8 @@ These results are not great. Results might be improved by using a different (pos
     
   # Create model on training data.
   naive_bayes_model = naiveBayes(formula = airline_sentiment ~., 
-                                 data = tweet_tdm_train)
+                                 data = tweet_tdm_train, 
+                                 laplace = 1)
     
   # Predict values for training and test sets.
   training_pred = predict(naive_bayes_model, 
@@ -208,23 +213,42 @@ These results are not great. Results might be improved by using a different (pos
                       type = 'class')
   
   # Add predictions to training and test sets.
-  tweet_tdm_train$pred = training_pred
-  tweet_tdm_test$pred = test_pred
+  tweet_tdm_train$predicted_sentiment_nb = training_pred
+  tweet_tdm_test$predicted_sentiment_nb = test_pred
   
   # Change training and test set to 'data.table' to help communication of results below.
   tweet_tdm_train = as.data.table(tweet_tdm_train)
   tweet_tdm_test = as.data.table(tweet_tdm_test)
   
   # Compute cross validation error.
-  t = tune(method = 'naiveBayes', 
+  cv_error = tune(method = 'naiveBayes', 
            airline_sentiment ~., 
            data = tweet_tdm_train, 
            size = 5)
   
+  # Note: in the reporting below, including the 'cv_error' from above breaks RMarkdown.
+  # Adding 'print(cv_error)' seems to just be ignored.
+  # So, I just manually write in the cross validation error.
+  
 ```
+After computing feature importance for each word, I include the 110 words with a non-zero (actually, greater than 0) feature importance.
 
-The training error is `r round(nrow(tweet_tdm_train[airline_sentiment != pred]) / nrow(tweet_tdm_train), 2)`.
-`r t`
-The test error is `r round(nrow(tweet_tdm_test[airline_sentiment != pred]) / nrow(tweet_tdm_test), 2)`.
+Results:   
+Training error: `r 100 * round(nrow(tweet_tdm_train[airline_sentiment != predicted_sentiment_nb]) / nrow(tweet_tdm_train), 4)`%   
+Cross Validation error: 58.61%     
+Test error: `r 100 * round(nrow(tweet_tdm_test[airline_sentiment != predicted_sentiment_nb]) / nrow(tweet_tdm_test), 4)`%   
 
-These results, while 
+Results by tweet classification category:   
+`r nrow(tweet_tdm_test[airline_sentiment == predicted_sentiment_nb & airline_sentiment == 'positive'])` out of `r nrow(tweet_tdm_test[airline_sentiment == 'positive'])` (`r round(100 * nrow(tweet_tdm_test[airline_sentiment == predicted_sentiment_nb & airline_sentiment == 'positive']) / nrow(tweet_tdm_test[airline_sentiment == 'positive']), 2)`)% of positive tweets are classified correctly.
+
+`r nrow(tweet_tdm_test[airline_sentiment == predicted_sentiment_nb & airline_sentiment == 'neutral'])` out of `r nrow(tweet_tdm_test[airline_sentiment == 'neutral'])` (`r round(100 * nrow(tweet_tdm_test[airline_sentiment == predicted_sentiment_nb & airline_sentiment == 'neutral']) / nrow(tweet_tdm_test[airline_sentiment == 'neutral']), 2)`)% of neutral tweets are classified correctly.
+
+`r nrow(tweet_tdm_test[airline_sentiment == predicted_sentiment_nb & airline_sentiment == 'negative'])` out of `r nrow(tweet_tdm_test[airline_sentiment == 'negative'])` (`r round(100 * nrow(tweet_tdm_test[airline_sentiment == predicted_sentiment_nb & airline_sentiment == 'negative']) / nrow(tweet_tdm_test[airline_sentiment == 'negative']), 2)`)% of negative tweets are classified correctly.
+
+Overall, the Naive Bayes model performs slightly better than the lexicon based model. Interestingly, the Naive Bayes model does extremely well on positive tweets and much better than the lexicon based model. However, Naive Bayes does poorly on neutral tweets and much worse than the lexicon based model. Naive Bayes does somewhat better than the lexicon based model when classifying negative tweets.
+
+Interestingly, training, cross validation, and test set error are almost identical.
+
+**Further Exploration:**
+
+Better results might be achieved by using a different feature engineering process (more or less features) or by tuning some Naive Bayes model parameters (the laplace smoothing parameter is one option).
