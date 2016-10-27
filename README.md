@@ -11,10 +11,8 @@ The dataset ('Airline-Sentiment-2-w-AA.csv') is included in both branches.
 The R branch includes the RMarkdown script containing the analysis ('airline_tweet_analysis.Rmd'). <br />
 It also contains a PDF file ('airline_tweet_analysis.pdf') that is the product (with some intermediate editing) of running the RMarkdown script.
 
-The Python branch...
-***
-TO BE FILLED IN
-***
+The Python branch contains a Jupyter Notebook file ('airline_tweet_analysis.ipynb') with the analysis.
+There is also an image file ('airline_tweet_analysis_wordcloud.png') of a wordcloud of the cleaned data since this image does not show up in the Jupyter notebook.
 
 #### Dataset Details:
 I use the 'Airline Twitter sentiment' dataset obtained at the URL below. To find the dataset, search for 'Airline' on the page. <br />
