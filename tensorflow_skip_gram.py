@@ -10,7 +10,8 @@
 import os
 import pandas as pd
 import tensorflow as tf
-import collections as col # 'collections' module deals with data containers and counting. 
+import collections as col # 'collections' module deals with data containers and counting.
+import random as rand
 
 #############
 # IMPORT DATA
@@ -131,14 +132,81 @@ string_indices, counts, word_dict, reverse_word_dict = build_dataset(tf_string)
 ################################################################
 # This section creates a function that generates a training
 # batch for the skip-gram model.
+# A skip-gram model picks a word in the center of a string to
+# start and uses another word in the string as the target.
 
 # Create index variable to track position in 'string_indices'.
 string_index = 0
 
 # Define function to generate training batch for skip-gram model.
-# 'batch_size
-def generate_training_batch(batch_size, samples, sample_range):
+# 'batch_size' is the size of the training batch.
+# 'start_word_index' is the index of the starting word.
+# It is also half of the words available for sampling as targets.
+# 'samples' is the number of targets picked for each 'start_word_index'.
+# 'string_index' tracks the relevant position in 'string_indices'.
+# Note that 'batch_size' / 'samples' should be a positive integer.
+# Note that 'samples' <= 2 * 'start_word_index' must hold.
+# Otherwise, I'm asking the model to sample more words than are available.
+def generate_training_batch(batch_size, start_word_index, samples, string_index):
 
+    # Create 'batch' and 'labels'...initial values don't matter as they are later replaced.
+    train_examples = np.ndarray(shape = batch_size,
+                                dtype = np.int32)
+    labels = np.ndarray(shape = (batch_size, 1),
+                        dtype = np.int32)
+
+    # Define relevant substring length.
+    # The relevant substring is the starting word and the words to either side
+    # available for sampling as targets.
+    substring_length = (2 * start_word_index) + 1
+
+    # Set up a list-like object with maximum length of 'substring_length'.
+    # This will hold all words of the relevant substring.
+    substring = collections.deque(maxlen = substring_length)
+
+    # Fill 'substring' with elements of 'string_indices' starting at
+    # 'string_index' and adding 'substring_length' elements.
+    for _ in range(substring_length):
+
+        # Add elemnt of 'string_indices' to 'substring'.
+        substring.append(string_indices[string_index])
+
+        # Increment 'string_index'.
+        string_index = (string_index + 1) % len(string_indices)
+
+    # Loop through starting words of model.
+    for i in range(batch_size / samples):
+
+        # Initialize 'target' variable.
+        # This will be the target for the model.
+        # I set it as 'start_word_index' now, but it will change.
+        # 'start_word_index' is the training example, so it can't be the target!
+        target = start_word_index
+
+        # Skip-gram starts with the word in the center of 'substring'
+        # and uses another word in 'substring' as target.
+        # So the word in the center of 'substring' can't be the target.
+        to_avoid = [start_word_index]
+
+        # For each starting word, loop through the 'samples'.
+        for j in range(samples):
+
+            # If 'target' is in 'to_avoid', resample 'target'.
+            while target in to_avoid:
+                target = rand.randint(0, (substring_length - 1))
+
+            # Add 'target' to 'to_avoid' so this particular training example isn't repeated.
+            to_avoid.append(target)
+
+            # Fill in 'train_examples' and 'labels'.
+            train_examples[(i * samples)+ j] = substring[start_word_index]
+            labels[(i * samples) + j] = substring[target]
+            
+
+
+        
+
+        return(string_index)
 
 
 
