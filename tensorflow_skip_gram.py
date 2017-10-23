@@ -168,7 +168,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
     # 'string_index' and adding 'substring_length' elements.
     for _ in range(substring_length):
 
-        # Add elemnt of 'string_indices' to 'substring'.
+        # Add element of 'string_indices' to 'substring'.
         substring.append(string_indices[string_index])
 
         # Increment 'string_index'.
@@ -186,6 +186,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
         # Skip-gram starts with the word in the center of 'substring'
         # and uses another word in 'substring' as target.
         # So the word in the center of 'substring' can't be the target.
+        # Create a list for indices to avoid as the target.
         to_avoid = [start_word_index]
 
         # For each starting word, loop through the 'samples'.
@@ -201,12 +202,48 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
             # Fill in 'train_examples' and 'labels'.
             train_examples[(i * samples)+ j] = substring[start_word_index]
             labels[(i * samples) + j] = substring[target]
-            
 
+        # Since we set a maximum length for 'substring',
+        # the 1st element is dropped and 'string_indices[string_index]' is added to the end.
+        # This is still in the 'i' loop!
+        # Conveyor belt idea.
+        substring.append(string_indices[string_index])
+        string_index = (string_index + 1) % len(string_indices)
 
-        
+    # Return function outputs.
+    return(train_examples, labels, string_index)
 
-        return(string_index)
+######################
+# SET MODEL PARAMETERS
+######################
+# This section sets parameters for the skip-gram model.
+
+# Set batch size.
+batch_size = 128
+
+# Set embedding size (# of features per vocabulary word).
+embedding_size = 128
+
+# Set how many words to consider left and right.
+# So this is half of the total words to consider for sampling as targets.
+# This also turns out to be the index of the starting word.
+start_word_index = 1
+
+# Set the number of samples to use for one starting word.
+# Another way to say it: select the number of labels to generate for one input.
+samples = 2
+
+# Set size of validation set.
+valid_size = 16
+
+# Pick validation set indices.
+# The corresponding words will have their nearest neighbors sampled.
+# I only consider the 100 most common words for the validation set.
+# These are the first 100 entries in 'word_dict'.
+validation_set = random.sample(range(100),
+                               valid_size)
+# LEFT OFF HERE
+
 
 
 
