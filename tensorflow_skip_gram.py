@@ -12,6 +12,7 @@ import pandas as pd
 import tensorflow as tf
 import collections as col # 'collections' module deals with data containers and counting.
 import random as rand
+import math
 
 #############
 # IMPORT DATA
@@ -150,8 +151,8 @@ string_index = 0
 def generate_training_batch(batch_size, start_word_index, samples, string_index):
 
     # Create 'batch' and 'labels'...initial values don't matter as they are later replaced.
-    train_examples = np.ndarray(shape = batch_size,
-                                dtype = np.int32)
+    inputs = np.ndarray(shape = batch_size,
+                        dtype = np.int32)
     labels = np.ndarray(shape = (batch_size, 1),
                         dtype = np.int32)
 
@@ -200,7 +201,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
             to_avoid.append(target)
 
             # Fill in 'train_examples' and 'labels'.
-            train_examples[(i * samples)+ j] = substring[start_word_index]
+            inputs[(i * samples)+ j] = substring[start_word_index]
             labels[(i * samples) + j] = substring[target]
 
         # Since we set a maximum length for 'substring',
@@ -211,7 +212,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
         string_index = (string_index + 1) % len(string_indices)
 
     # Return function outputs.
-    return(train_examples, labels, string_index)
+    return(inputs, labels, string_index)
 
 ######################
 # SET MODEL PARAMETERS
@@ -240,9 +241,77 @@ valid_size = 16
 # The corresponding words will have their nearest neighbors sampled.
 # I only consider the 100 most common words for the validation set.
 # These are the first 100 entries in 'word_dict'.
-validation_set = random.sample(range(100),
-                               valid_size)
-# LEFT OFF HERE
+# 'word_dict' was created such that sampling between 0 and 99 gets the
+# 100 most common words I want.
+validation_set = rand.sample(range(100),
+                             valid_size)
+
+# There are many possible output classes (5000).
+# Training the full model would require computing the softmax
+# for each class for each training example, which is slow.
+# So, for each training batch, I only consider a randomly chosen
+# subset of classes.
+# The number of classes randomly sampled is defined below.
+classes_sampled = 64
+
+###########
+# RUN MODEL
+###########
+# This section runs the skip-gram model.
+
+# Set up graph.
+graph = tf.Graph()
+with graph.as_default():
+
+    # Input data.
+    inputs_holder = tf.placeholder(tf.int32,
+                                   shape = batch_size)
+    labels_holder = tf.placeholder(tf.int32,
+                                   shape = [batch_size, 1])
+    validation_set_tf = tf.constant(validation_set,
+                                    dtype = tf.int32)
+
+    # Define embeddings variable.
+    # These are the (initially random) features for each vocabulary word.
+    embeddings = tf.Variable(tf.random_uniform(shape = [vocab_size, embedding_size],
+                                               minval = -1.0,
+                                               maxval = 1.0))
+
+    # Define weights.
+    # Dimensions are defined by 'tf.nn.sampled_softmax_loss' used below.
+    weights = tf.Variable(tf.truncated_normal(shape = [vocab_size, embedding_size],
+                                              stddev = 1.0 / math.sqrt(embedding_size)))
+
+    # Define biases.
+    # Dimensions are defined by 'tf.nn.sampled_softmax_loss' used below.
+    biases = tf.Variable(tf.zeros([vocab_size]))
+
+    # Get embeddings for inputs.
+    input_embeddings = tf.nn.embedding_lookup(embeddings,
+                                              inputs_holder)
+
+    # Define loss function.
+    loss = tf.reduce_mean(tf.nn.sampled_softmax_loss(weights = weights,
+                                                     biases = biases,
+                                                     inputs = input_embeddings,
+                                                     labels = labels_holder,
+                                                     num_sampled = classes_sampled,
+                                                     num_classes = vocab_size))
+
+    # Define optimizer.
+    # 'embeddings', 'weights', and 'biases' are optimized since they're
+    # all defined as variables above.
+    # Why this particular optimizer? Good question, that's the one in the example I'm using.
+    optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
+
+    #
+
+
+
+
+
+
+
 
 
 
