@@ -14,6 +14,8 @@ import collections as col # 'collections' module deals with data containers and 
 import numpy as np
 import random as rand
 import math
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 #############
 # IMPORT DATA
@@ -71,7 +73,7 @@ tf_string = tf.compat.as_str(single_string).split()
 ##################
 # BUILD DICTIONARY
 ##################
-# This section builds the dictionary and replaces rare words with an 'unknown' token.
+# This section builds the dictionary and replaces rare words with an 'unknown word' token.
 
 # Choose size of vocabulary for dictionary.
 vocab_size = 5000
@@ -80,7 +82,7 @@ vocab_size = 5000
 def build_dataset(string):
 
     # Create list with 1 initial entry.
-    counts = [['unknown', -1]]
+    counts = [['unknown word', -1]]
 
     # Get counts of the most common words.
     # '.extend' extends 'counts'.
@@ -110,7 +112,7 @@ def build_dataset(string):
 
         else:
 
-            # For words not in 'word_dict' set index to 0, which corresponds to 'unknown'.
+            # For words not in 'word_dict' set index to 0, which corresponds to 'unknown word'.
             index = 0
             
             # Increment unknown word counter ('unknown_counter') by 1.
@@ -119,7 +121,7 @@ def build_dataset(string):
         # Add 'index' to 'string_indices'.
         string_indices.append(index)
 
-    # 'counts[0]' is still '['unknown', -1]'.
+    # 'counts[0]' is still '['unknown word', -1]'.
     # Replace the '-1' with 'unknown_counter', the true count of unknown words.
     counts[0][1]  = unknown_counter
 
@@ -260,7 +262,7 @@ validation_set = rand.sample(range(100),
 classes_sampled = 64
 
 # Set number of steps to iterate.
-steps = 10001
+steps = 100001
 
 # Set number of neighbors to look at for validation set words.
 neighbors = 8
@@ -416,9 +418,58 @@ with tf.Session(graph = graph) as session:
 
     # Get final normalized embeddings.
     final_norm_embeddings = normalized_embeddings.eval()
-               
 
-        
+#############################
+# VISUALIZE RESULTS WITH TSNE
+#############################
+# This section visualizes some of the results of the skip-gram model
+# using TSNE (t-distributed stochastic neighbor embedding).
+
+# Set the number of words to visualize using TSNE.
+tsne_words = 400
+
+# Create TSNE object.
+tsne = TSNE()
+
+# Conduct TSNE on  'final_norm_embeddings'.
+# I choose to use the first 400 words in 'embeddings'.
+# These are also the 400 most common words.
+# I start at index 1 and not 0, because the 0 index corresponds to 'unknown word'.
+final_norm_embeddings_tsne = tsne.fit_transform(final_norm_embeddings[1 : (tsne_words + 1)])
+
+# Create figure and subplot.
+fig = plt.figure()
+ax1 = fig.add_subplot(1, 1, 1)
+
+# Add scatter plot data.
+plt.scatter(final_norm_embeddings_tsne[:, 0],
+            final_norm_embeddings_tsne[:, 1],
+            s = 4.5)
+
+# Add labels for the word corresponding to each TSNE-resulting point.
+# 'final_norm_embeddings_tsne' excluded the first word ('unknown word'),
+# so it uses index 'i'.
+# The 1st entry of 'reverse_word_dict' corresponds to 'unknown word', which I'm not interested in.
+# So 'reverse_word_dict' uses index 'i + 1'.
+for i in range(tsne_words):
+
+    # Add annotations.
+    plt.annotate(reverse_word_dict[i + 1],
+                 xy = (final_norm_embeddings_tsne[i, 0],
+                       final_norm_embeddings_tsne[i, 1]),
+                 xytext = (final_norm_embeddings_tsne[i, 0] + 0.1,
+                           final_norm_embeddings_tsne[i, 1] + 0.1),
+                 size = 7.5)
+
+# Add plot title.
+plt.title('Skip-gram TSNE Results for Top Words')
+
+# Show plot.
+plt.show()
+
+
+
+
 
 
 
