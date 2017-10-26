@@ -11,6 +11,7 @@ import os
 import pandas as pd
 import tensorflow as tf
 import collections as col # 'collections' module deals with data containers and counting.
+import numpy as np
 import random as rand
 import math
 
@@ -53,6 +54,10 @@ text.replace(regex = True, inplace = True, to_replace = '\)', value = '')  # par
 text.replace(regex = True, inplace = True, to_replace = '\d+', value = '')  # all digits
 text.replace(regex = True, inplace = True, to_replace = 'virginamerica', value = '')  # airline tag
 text.replace(regex = True, inplace = True, to_replace = 'americanair', value = '')  # airline tag
+text.replace(regex = True, inplace = True, to_replace = 'united', value = '')  # airline tag
+text.replace(regex = True, inplace = True, to_replace = 'southwestair', value = '')  # airline tag
+text.replace(regex = True, inplace = True, to_replace = 'jetblue', value = '')  # airline tag
+text.replace(regex = True, inplace = True, to_replace = 'usairways', value = '')  # airline tag
 text = text.str.strip() # remove leading and trailing spaces
 text.replace(regex = True, inplace = True, to_replace = '  ', value = ' ')  # double spaces with spaces
 
@@ -163,7 +168,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
 
     # Set up a list-like object with maximum length of 'substring_length'.
     # This will hold all words of the relevant substring.
-    substring = collections.deque(maxlen = substring_length)
+    substring = col.deque(maxlen = substring_length)
 
     # Fill 'substring' with elements of 'string_indices' starting at
     # 'string_index' and adding 'substring_length' elements.
@@ -176,7 +181,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
         string_index = (string_index + 1) % len(string_indices)
 
     # Loop through starting words of model.
-    for i in range(batch_size / samples):
+    for i in range(batch_size // samples):
 
         # Initialize 'target' variable.
         # This will be the target for the model.
@@ -254,6 +259,12 @@ validation_set = rand.sample(range(100),
 # The number of classes randomly sampled is defined below.
 classes_sampled = 64
 
+# Set number of steps to iterate.
+steps = 10001
+
+# Set number of neighbors to look at for validation set words.
+neighbors = 8
+
 ###########
 # RUN MODEL
 ###########
@@ -304,7 +315,110 @@ with graph.as_default():
     # Why this particular optimizer? Good question, that's the one in the example I'm using.
     optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
 
-    #
+    # Compute similarity (cosine distance) between validation set words and all words in vocabulary.
+    # This lets me see the words in the vocabulary that are "closest" to the
+    # validation set words.
+
+    # Create a version of 'embeddings' where all rows have length 1 (unit vector).
+    # This is necessary to compute cosine distance.
+
+    # Compute the necessary dividing factor for each row of 'embeddings'.
+    embedding_normalizer = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1,
+                                                 keep_dims = True))
+
+    # Create normalized version of 'embeddings' where all rows have length 1.
+    normalized_embeddings = embeddings / embedding_normalizer
+
+    # Get normalized embeddings for validation set.  
+    validation_norm_embeddings = tf.nn.embedding_lookup(normalized_embeddings,
+                                                        validation_set)
+
+    # Compute similarity (cosine distance) between validation set words and every word in
+    # vocabulary. This seems weird but turns out to be cosine distance.
+    # Looking up the formula for cosine distance on Wikipedia and writing out the
+    # dimensions of the matrix multiplication helped me see the trick.
+    similarity_matrix = tf.matmul(validation_norm_embeddings, tf.transpose(normalized_embeddings))
+
+# Run graph.
+with tf.Session(graph = graph) as session:
+
+    # Initialize variables.
+    tf.global_variables_initializer().run()
+
+    # Set initial average loss.
+    average_loss = 0
+
+    # Iterate.
+    for step in range(steps):
+
+        # Generate batch input and labels.
+        batch_input, batch_labels, string_index = generate_training_batch(batch_size, start_word_index, samples, string_index)
+
+        # Run optimizer, feeding 'batch_input' and 'batch_labels' to 'inputs_holder'
+        # and 'labels_holder' respectively.
+        _, l = session.run([optimizer, loss],
+                           feed_dict = {inputs_holder : batch_input,
+                                        labels_holder : batch_labels})
+
+        # Update 'average_loss'.
+        average_loss += l
+
+        # Print 'average_loss' every so often.
+        if step % 500 == 0:
+
+            # Divide 'average_loss' by the printing interval to get an estimate of
+            # the loss over the last 'printing_interval' batches.
+            average_loss = average_loss / 100
+
+            # Print 'average_loss'.            
+            print('Step', step, 'Average Loss: ', average_loss)
+
+            # Reset 'average_loss' to 0.
+            average_loss = 0
+
+        # Print validation set nearest neighbors every so often.
+        if step % 1000 == 0:
+
+            # Compute similarity matrix (defined above).
+            sim = similarity_matrix.eval()
+
+            # Show nearest neighbors for validation set words.
+            for i in range(valid_size):
+
+                # Get actual validation set word from 'reverse_dictionary'.
+                # The entries of 'validation_set' are numbers that correspond
+                # to the keys of 'reverse_word_dict'.
+                valid_word = reverse_word_dict[validation_set[i]]
+
+                # Get the indices of the nearest words to 'valid_word'.
+                # 'sim' is the similarity matrix.
+                # I want the row corresponding to 'i', the relevant validation set word.
+                # 'argsort()' returns arguments starting with the lowest, so I use '-sim'.
+                # I only want the closest neighors so I use [1 : (neighbors + 1)].
+                # I exclude the first element, because that will be the same word
+                # as the validation set word!
+                nearest = (-sim[i, :]).argsort()[1 : (neighbors + 1)]
+
+                # Create string to help with printing.
+                val_string = 'Nearest neighbors to ' + valid_word + ': '
+
+                # Get the nearest neighbors for each validation set word.
+                for j in range(len(nearest)):
+
+                    # Get the actual word for one of the closest neighbors.
+                    neighbor = reverse_word_dict[nearest[j]]
+
+                    # Add that word to 'val_string'.
+                    val_string = val_string + neighbor + ', '
+
+                # Print validation set word and nearest neighbors.
+                print(val_string)
+
+    # Get final normalized embeddings.
+    final_norm_embeddings = normalized_embeddings.eval()
+               
+
+        
 
 
 
