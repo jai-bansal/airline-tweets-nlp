@@ -135,24 +135,15 @@ def build_dataset(string):
 # Call 'build_dataset' on 'tf_string'.
 string_indices, counts, word_dict, reverse_word_dict = build_dataset(tf_string)
 
-
-
-
-
-
-
-
-
-
-
-
-
 ###########################################################
 # CREATE FUNCTION TO GENERATE TRAINING BATCH FOR CBOW MODEL
 ###########################################################
 # This section creates a function that generates a training batch for the CBOW model.
 # A CBOW model picks a word in the center of a string AS THE TARGET and uses another
 # word in the string as the input.
+# The version implemented below uses the same target.
+# But as input, it uses the sum of all the word vectors in the target's context or
+# surroundings.
 
 # Create index variable to track position in 'string_indices'.
 string_index = 0
@@ -160,23 +151,19 @@ string_index = 0
 # Define function to generate training batch for CBOW model.
 # 'batch_size' is the size of the training batch.
 # 'center_word_index' is the index of the center word of the string.
-# It is also half of the words available for sampling as inputs.
-# 'samples' is the number of inputs picked for each 'center_word_index'.
+# 'center_word_index' is also half of the total context words.
 # 'string_index' tracks the relevant position in 'string_indices'.
-# Note that 'batch_size' / 'samples' should be a positive integer.
-# Note that 'samples' <= 2 * 'center_word_index' must hold.
-# Otherwise, I'm asking the model to sample more words than are available.
-def generate_training_batch(batch_size, center_word_index, samples, string_index):
+def generate_training_batch(batch_size, center_word_index, string_index):
 
-    # Create 'batch' and 'labels'...initial values don't matter as they are later replaced.
-    inputs = np.ndarray(shape = batch_size,
+    # Create 'inputs' and 'labels'...initial values don't matter as they are later replaced.
+    # 'inputs' has a column for each context word surrounding the target.
+    inputs = np.ndarray(shape = (batch_size, (2 * window)),
                         dtype = np.int32)
     labels = np.ndarray(shape = (batch_size, 1),
                         dtype = np.int32)
 
     # Define relevant substring length.
-    # The relevant substring is the starting word and the words to either side
-    # available for sampling as inputs.
+    # The relevant substring is the center word and the surrounding context words.
     substring_length = (2 * center_word_index) + 1
 
     # Set up a list-like object with maximum length of 'substring_length'.
@@ -193,32 +180,20 @@ def generate_training_batch(batch_size, center_word_index, samples, string_index
         # Increment 'string_index'.
         string_index = (string_index + 1) % len(string_indices)
 
-    # Loop through inputs of model.
-    for i in range(batch_size // samples):
+    # Create batch with loop.
+    for i in range(batch_size):
 
-        # Initialize 'input' variable. This will be the model input.
-        # It is 'center_word_index'.
-        input = center_word_index
+        # Create list version of 'substring'.
+        substring_list = list(substring)
 
-        # CBOW starts with the word in the center of 'substring'
-        # and uses another word in 'substring' as target.
-        # So the word in the center of 'substring' can't be the target.
-        # Create a list for indices to avoid as the target.
-        to_avoid = [center_word_index]
+        # The center word of 'substring' is the target.
+        # This is the center element of 'substring_list'.
+        labels[i] = substring_list.pop(center_word_index)
 
-        # For each starting word, loop through the 'samples'.
-        for j in range(samples):
-
-            # If 'target' is in 'to_avoid', resample 'target'.
-            while target in to_avoid:
-                target = rand.randint(0, (substring_length - 1))
-
-            # Add 'target' to 'to_avoid' so this particular training example isn't repeated.
-            to_avoid.append(target)
-
-            # Fill in 'train_examples' and 'labels'.
-            inputs[(i * samples)+ j] = substring[center_word_index]
-            labels[(i * samples) + j] = substring[target]
+        # All remaining words in 'substring_list' are the input.
+        # The corresponding embeddings of these words will later be
+        # summed to create the final model input.
+        input[i] = substring_list
 
         # Since we set a maximum length for 'substring',
         # the 1st element is dropped and 'string_indices[string_index]' is added to the end.
@@ -229,4 +204,91 @@ def generate_training_batch(batch_size, center_word_index, samples, string_index
 
     # Return function outputs.
     return(inputs, labels, string_index)
+
+######################
+# SET MODEL PARAMETERS
+######################
+# This section sets parameters for the CBOW model.
+
+# Set batch size.
+batch_size = 128
+
+# Set embedding size (# of features per vocabulary word).
+embedding_size = 128
+
+# Pick the index for the center word of the string.
+# This ends up defining the length of the relevant string,
+# which is (2 * center_word_index) + 1.
+center_word_index = 2
+
+# Set size of validation set.
+valid_size = 16
+
+# Pick validation set indices.
+# The corresponding words will have their nearest neighbors sampled.
+# I only consider the 100 most common words for the validation set.
+# These are the first 100 entries in 'word_dict'.
+# 'word_dict' was created such that sampling between 0 and 99 gets the
+# 100 most common words I want.
+validation_set = rand.sample(range(100),
+                             valid_size)
+
+# There are many possible output classes (5000).
+# Training the full model would require computing the softmax
+# for each class for each training example, which is slow.
+# So, for each training batch, I only consider a randomly chosen
+# subset of classes.
+# The number of classes randomly sampled is defined below.
+classes_sampled = 64
+
+# Set number of steps to iterate.
+steps = 1001
+
+# Set number of neighbors to look at for validation set words.
+neighbors = 8
+
+###########
+# RUN MODEL
+###########
+# This section runs the skip-gram model.
+
+# Set up graph.
+graph = tf.Graph()
+with graph.as_default():    
+
+    # Input data.
+    inputs_holder = tf.placeholder(tf.int32,
+                                   shape = [batch_size, (2 * center_word_index)])
+    labels_holder = tf.placeholder(tf.int32,
+                                   shape = [batch_size, 1])
+    validation_set_tf = tf.constant(validation_set,
+                                    dtype = tf.int32)
+
+    # Define embeddings variable.
+    # These are the (initially random) features for each vocabulary word.
+    embeddings = tf.Variable(tf.random_uniform(shape = [vocab_size, embedding_size],
+                                               minval = -1.0,
+                                               maxval = 1.0))
+
+    # Define weights.
+    weights = tf.Variable(tf.truncated_normal(shape = [vocab_size, embedding_size],
+                                              stddev = 1.0 / math.sqrt(embedding_size)))
+
+    # Define biases.
+    biases = tf.Variable(tf.zeros([vocab_size]))
+
+    
+
+        
+        
+
+    
+
+    
+
+    
+
+    
+
+ 
 
