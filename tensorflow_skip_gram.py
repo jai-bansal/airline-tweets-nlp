@@ -157,7 +157,7 @@ string_index = 0
 # Otherwise, I'm asking the model to sample more words than are available.
 def generate_training_batch(batch_size, center_word_index, samples, string_index):
 
-    # Create 'batch' and 'labels'...initial values don't matter as they are later replaced.
+    # Create 'inputs' and 'labels'...initial values don't matter as they are later replaced.
     inputs = np.ndarray(shape = batch_size,
                         dtype = np.int32)
     labels = np.ndarray(shape = (batch_size, 1),
