@@ -140,22 +140,22 @@ string_indices, counts, word_dict, reverse_word_dict = build_dataset(tf_string)
 ################################################################
 # This section creates a function that generates a training
 # batch for the skip-gram model.
-# A skip-gram model picks a word in the center of a string to
-# start and uses another word in the string as the target.
+# A skip-gram model picks a word in the center of a string as
+# input and uses another word in the string as the target.
 
 # Create index variable to track position in 'string_indices'.
 string_index = 0
 
 # Define function to generate training batch for skip-gram model.
 # 'batch_size' is the size of the training batch.
-# 'start_word_index' is the index of the starting word.
+# 'center_word_index' is the index of the starting word.
 # It is also half of the words available for sampling as targets.
-# 'samples' is the number of targets picked for each 'start_word_index'.
+# 'samples' is the number of targets picked for each 'center_word_index'.
 # 'string_index' tracks the relevant position in 'string_indices'.
 # Note that 'batch_size' / 'samples' should be a positive integer.
-# Note that 'samples' <= 2 * 'start_word_index' must hold.
+# Note that 'samples' <= 2 * 'center_word_index' must hold.
 # Otherwise, I'm asking the model to sample more words than are available.
-def generate_training_batch(batch_size, start_word_index, samples, string_index):
+def generate_training_batch(batch_size, center_word_index, samples, string_index):
 
     # Create 'batch' and 'labels'...initial values don't matter as they are later replaced.
     inputs = np.ndarray(shape = batch_size,
@@ -166,7 +166,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
     # Define relevant substring length.
     # The relevant substring is the starting word and the words to either side
     # available for sampling as targets.
-    substring_length = (2 * start_word_index) + 1
+    substring_length = (2 * center_word_index) + 1
 
     # Set up a list-like object with maximum length of 'substring_length'.
     # This will hold all words of the relevant substring.
@@ -187,15 +187,15 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
 
         # Initialize 'target' variable.
         # This will be the target for the model.
-        # I set it as 'start_word_index' now, but it will change.
-        # 'start_word_index' is the training example, so it can't be the target!
-        target = start_word_index
+        # I set it as 'center_word_index' now, but it will change.
+        # 'center_word_index' is the training example, so it can't be the target!
+        target = center_word_index
 
         # Skip-gram starts with the word in the center of 'substring'
         # and uses another word in 'substring' as target.
         # So the word in the center of 'substring' can't be the target.
         # Create a list for indices to avoid as the target.
-        to_avoid = [start_word_index]
+        to_avoid = [center_word_index]
 
         # For each starting word, loop through the 'samples'.
         for j in range(samples):
@@ -208,7 +208,7 @@ def generate_training_batch(batch_size, start_word_index, samples, string_index)
             to_avoid.append(target)
 
             # Fill in 'train_examples' and 'labels'.
-            inputs[(i * samples)+ j] = substring[start_word_index]
+            inputs[(i * samples)+ j] = substring[center_word_index]
             labels[(i * samples) + j] = substring[target]
 
         # Since we set a maximum length for 'substring',
@@ -235,7 +235,7 @@ embedding_size = 128
 # Set how many words to consider left and right.
 # So this is half of the total words to consider for sampling as targets.
 # This also turns out to be the index of the starting word.
-start_word_index = 1
+center_word_index = 1
 
 # Set the number of samples to use for one starting word.
 # Another way to say it: select the number of labels to generate for one input.
@@ -354,7 +354,7 @@ with tf.Session(graph = graph) as session:
     for step in range(steps):
 
         # Generate batch input and labels.
-        batch_input, batch_labels, string_index = generate_training_batch(batch_size, start_word_index, samples, string_index)
+        batch_input, batch_labels, string_index = generate_training_batch(batch_size, center_word_index, samples, string_index)
 
         # Run optimizer, feeding 'batch_input' and 'batch_labels' to 'inputs_holder'
         # and 'labels_holder' respectively.
