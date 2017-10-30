@@ -257,6 +257,7 @@ graph = tf.Graph()
 with graph.as_default():    
 
     # Input data.
+    # 'inputs_holder' has 1 column for each context word.
     inputs_holder = tf.placeholder(tf.int32,
                                    shape = [batch_size, (2 * center_word_index)])
     labels_holder = tf.placeholder(tf.int32,
@@ -276,6 +277,59 @@ with graph.as_default():
 
     # Define biases.
     biases = tf.Variable(tf.zeros([vocab_size]))
+
+    # Get embeddings for inputs.
+    input_embeddings = tf.nn.embedding_lookup(embeddings,
+                                              inputs_holder)
+
+    # Define loss function.
+    # The embeddings for the context words are summed.
+    loss = tf.reduce_mean(tf.nn.sampled_softmax_loss(weights = weights,
+                                                     biases = biases,
+                                                     inputs = tf.reduce_sum(input_embeddings, 1),
+                                                     labels = labels_holder,
+                                                     num_sampled = classes_sampled,
+                                                     num_classes = vocab_size))
+
+    # Define optimizer.
+    # 'embeddings', 'weights', and 'biases' are optimized since they're
+    # all defined as variables above.
+    # Why this particular optimizer? Good question, that's the one in the example I'm using.
+    optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
+
+    # Create a version of 'embeddings' where all rows have length 1 (unit vector).
+    # This is necessary to compute cosine distance.
+
+    # Compute the necessary dividing factor for each row of 'embeddings'.
+    embedding_normalizer = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1,
+                                                 keep_dims = True))
+
+    # Create normalized version of 'embeddings' where all rows have length 1.
+    normalized_embeddings = embeddings / embedding_normalizer
+
+    # Get normalized embeddings for validation set.  
+    validation_norm_embeddings = tf.nn.embedding_lookup(normalized_embeddings,
+                                                        validation_set)
+
+    # Compute similarity (cosine distance) between validation set words and every word in
+    # vocabulary. This seems weird but turns out to be cosine distance.
+    # Looking up the formula for cosine distance on Wikipedia and writing out the
+    # dimensions of the matrix multiplication helped me see the trick.
+    similarity_matrix = tf.matmul(validation_norm_embeddings, tf.transpose(normalized_embeddings))
+
+# Run graph.
+with tf.Session(graph = graph) as session:
+
+    # Initialize variables.
+    tf.global_variables_initializer().run()
+
+    # Set initial average loss.
+    average_loss = 0
+
+    # Iterate.
+    for step in range(steps):
+
+    
 
     
 
