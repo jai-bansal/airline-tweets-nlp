@@ -264,6 +264,14 @@ classes_sampled = 64
 # Set number of steps to iterate.
 steps = 100001
 
+# Set interval for printing average loss.
+# The average loss will be printed at this interval of steps.
+average_loss_interval = 500
+
+# Set interval for printing nearest neighbors.
+# Nearest neighbors for the validation set will be printed at this interval of steps.
+nearest_neighbor_interval = 1000
+
 # Set number of neighbors to look at for validation set words.
 neighbors = 8
 
@@ -366,11 +374,11 @@ with tf.Session(graph = graph) as session:
         average_loss += l
 
         # Print 'average_loss' every so often.
-        if step % 500 == 0:
+        if step % average_loss_interval == 0:
 
             # Divide 'average_loss' by the printing interval to get an estimate of
-            # the loss over the last 'printing_interval' batches.
-            average_loss = average_loss / 100
+            # the loss over the last 'average_loss_interval' batches.
+            average_loss = average_loss / average_loss_interval
 
             # Print 'average_loss'.            
             print('Step', step, 'Average Loss: ', average_loss)
@@ -379,7 +387,7 @@ with tf.Session(graph = graph) as session:
             average_loss = 0
 
         # Print validation set nearest neighbors every so often.
-        if step % 1000 == 0:
+        if step % nearest_neighbor_interval == 0:
 
             # Compute similarity matrix (defined above).
             sim = similarity_matrix.eval()

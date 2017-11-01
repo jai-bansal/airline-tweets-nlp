@@ -157,7 +157,7 @@ def generate_training_batch(batch_size, center_word_index, string_index):
 
     # Create 'inputs' and 'labels'...initial values don't matter as they are later replaced.
     # 'inputs' has a column for each context word surrounding the target.
-    inputs = np.ndarray(shape = (batch_size, (2 * window)),
+    inputs = np.ndarray(shape = (batch_size, (2 * center_word_index)),
                         dtype = np.int32)
     labels = np.ndarray(shape = (batch_size, 1),
                         dtype = np.int32)
@@ -193,7 +193,7 @@ def generate_training_batch(batch_size, center_word_index, string_index):
         # All remaining words in 'substring_list' are the input.
         # The corresponding embeddings of these words will later be
         # summed to create the final model input.
-        input[i] = substring_list
+        inputs[i] = substring_list
 
         # Since we set a maximum length for 'substring',
         # the 1st element is dropped and 'string_indices[string_index]' is added to the end.
@@ -243,6 +243,14 @@ classes_sampled = 64
 
 # Set number of steps to iterate.
 steps = 1001
+
+# Set interval for printing average loss.
+# The average loss will be printed at this interval of steps.
+average_loss_interval = 500
+
+# Set interval for printing nearest neighbors.
+# Nearest neighbors for the validation set will be printed at this interval of steps.
+nearest_neighbor_interval = 1000
 
 # Set number of neighbors to look at for validation set words.
 neighbors = 8
@@ -329,6 +337,37 @@ with tf.Session(graph = graph) as session:
     # Iterate.
     for step in range(steps):
 
+        # Generate batch input and labels.
+        batch_input, batch_labels, string_index = generate_training_batch(batch_size, center_word_index, string_index)
+
+        # Run optimizer, feeding 'batch_input' and 'batch_labels' to 'inputs_holder'
+        # and 'labels_holder' respectively.
+        _, l = session.run([optimizer, loss],
+                           feed_dict = {inputs_holder : batch_input,
+                                        labels_holder : batch_labels})
+
+        # Update 'average_loss'.
+        average_loss += l
+
+        # Print 'average_loss' every so often.
+        if step % average_loss_interval == 0:
+
+            # Divide 'average_loss' by the printing interval to get an estimate of
+            # the loss over the last 'average_loss_interval' batches.
+            average_loss = average_loss / average_loss_interval
+
+            # Print 'average_loss'.            
+            print('Step', step, 'Average Loss: ', average_loss)
+
+            # Reset 'average_loss' to 0.
+            average_loss = 0
+
+        # Print validation set nearest neighbors every so often.
+        if step % nearest_neighbor_interval == 0:
+
+        
+
+        
     
 
     
