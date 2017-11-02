@@ -305,6 +305,10 @@ with graph.as_default():
     # Why this particular optimizer? Good question, that's the one in the example I'm using.
     optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
 
+    # Compute similarity (cosine distance) between validation set words and all words in vocabulary.
+    # This lets me see the words in the vocabulary that are "closest" to the
+    # validation set words.
+
     # Create a version of 'embeddings' where all rows have length 1 (unit vector).
     # This is necessary to compute cosine distance.
 
@@ -364,6 +368,52 @@ with tf.Session(graph = graph) as session:
 
         # Print validation set nearest neighbors every so often.
         if step % nearest_neighbor_interval == 0:
+
+            # Compute similarity matrix (defined above).
+            sim = similarity_matrix.eval()
+
+            # Show nearest neighbors for validation set words.
+            for i in range(valid_size):
+
+                # Get actual validation set word from 'reverse_dictionary'.
+                # The entries of 'validation_set' are numbers that correspond
+                # to the keys of 'reverse_word_dict'.
+                valid_word = reverse_word_dict[validation_set[i]]
+
+                # Get the indices of the nearest words to 'valid_word'.
+                # 'sim' is the similarity matrix.
+                # I want the row corresponding to 'i', the relevant validation set word.
+                # 'argsort()' returns arguments starting with the lowest, so I use '-sim'.
+                # I only want the closest neighors so I use [1 : (neighbors + 1)].
+                # I exclude the first element, because that will be the same word
+                # as the validation set word!
+                nearest = (-sim[i, :]).argsort()[1 : (neighbors + 1)]
+
+                # Create string to help with printing.
+                val_string = 'Nearest neighbors to ' + valid_word + ': '
+
+                # Get the nearest neighbors for each validation set word.
+                for j in range(len(nearest)):
+
+                    # Get the actual word for one of the closest neighbors.
+                    neighbor = reverse_word_dict[nearest[j]]
+
+                    # Add that word to 'val_string'.
+                    val_string = val_string + neighbor + ', '
+
+                # Print validation set word and nearest neighbors.
+                print(val_string)
+
+    # Get final normalized embeddings.
+    final_norm_embeddings = normalized_embeddings.eval()
+
+                
+
+                    
+
+                
+
+            
 
         
 
