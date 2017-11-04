@@ -242,7 +242,7 @@ validation_set = rand.sample(range(100),
 classes_sampled = 64
 
 # Set number of steps to iterate.
-steps = 1001
+steps = 100001
 
 # Set interval for printing average loss.
 # The average loss will be printed at this interval of steps.
@@ -406,6 +406,54 @@ with tf.Session(graph = graph) as session:
 
     # Get final normalized embeddings.
     final_norm_embeddings = normalized_embeddings.eval()
+
+#############################
+# VISUALIZE RESULTS WITH TSNE
+#############################
+# This section visualizes some of the results of the CBOW model
+# using TSNE (t-distributed stochastic neighbor embedding).
+
+# Set the number of words to visualize using TSNE.
+tsne_words = 400
+
+# Create TSNE object.
+tsne = TSNE()
+
+# Conduct TSNE on  'final_norm_embeddings'.
+# I choose to use the first 400 words in 'embeddings'.
+# These are also the 400 most common words.
+# I start at index 1 and not 0, because the 0 index corresponds to 'unknown word'.
+final_norm_embeddings_tsne = tsne.fit_transform(final_norm_embeddings[1 : (tsne_words + 1)])
+
+# Create figure and subplot.
+fig = plt.figure()
+ax1 = fig.add_subplot(1, 1, 1)
+
+# Add scatter plot data.
+plt.scatter(final_norm_embeddings_tsne[:, 0],
+            final_norm_embeddings_tsne[:, 1],
+            s = 4.5)
+
+# Add labels for the word corresponding to each TSNE-resulting point.
+# 'final_norm_embeddings_tsne' excluded the first word ('unknown word'),
+# so it uses index 'i'.
+# The 1st entry of 'reverse_word_dict' corresponds to 'unknown word', which I'm not interested in.
+# So 'reverse_word_dict' uses index 'i + 1'.
+for i in range(tsne_words):
+
+    # Add annotations.
+    plt.annotate(reverse_word_dict[i + 1],
+                 xy = (final_norm_embeddings_tsne[i, 0],
+                       final_norm_embeddings_tsne[i, 1]),
+                 xytext = (final_norm_embeddings_tsne[i, 0] + 0.1,
+                           final_norm_embeddings_tsne[i, 1] + 0.1),
+                 size = 7.5)
+
+# Add plot title.
+plt.title('CBOW TSNE Results for Top Words')
+
+# Show plot.
+plt.show()
 
                 
 
