@@ -1,5 +1,6 @@
 # This script builds a recurrent neural network (RNN) model
 # for airline tweet data using the 'tensorflow' package.
+# Specifically, it builds a long short term memory (LSTM) model.
 
 ################
 # IMPORT MODULES
@@ -10,6 +11,7 @@
 import pandas as pd
 import string
 import tensorflow as tf
+import numpy as np
 
 #############
 # IMPORT DATA
@@ -64,12 +66,23 @@ single_string = text.str.cat(sep = ' ')
 # Convert to 'tensorflow' string and split on spaces.
 tf_string = tf.compat.as_str(single_string)
 
-#######################
-# CREATE VALIDATION SET
-#######################
+#########################
+# DEFINE MODEL PARAMETERS
+#########################
+# This section defines model parameters.
 
 # Choose size of validation set.
 valid_size = 1000
+
+# Set training batch size.
+batch_size = 64
+
+# Set length of each string in the batch (in characters).
+batch_length = 10
+
+#######################
+# CREATE VALIDATION SET
+#######################
 
 # Divide 'tf_string' into training and validation sets.
 valid_text = tf_string[:valid_size]
@@ -118,8 +131,60 @@ def num_to_char(id):
 #######################
 # CREATE TRAINING BATCH
 #######################
-# This section defines a class and functions to create a training batch
-# for the RNN model
+# This section defines functions used to create a training batch
+# for the LSTM model.
+# It defines a new Python class to do this.
+# This section is very specific to the Udacity example I learned from.
+
+# Define new class that contains functions to generate training batch
+# for LSTM model.
+class BatchGenerator(object):
+
+    # Define initialization values.
+    def __init__(self, text, n_batch, len_batch):
+        self._text = text                           # text
+        self._n_batch = n_batch                     # batch size
+        self._len_batch = len_batch                 # length of each string in batch
+
+        # Define maximum length of each string in batch without overlap.
+        max_string_length = len(text) // n_batch
+
+        # Based on 'max_string_length', define starting positions for
+        # each string in the batch. The starting positions occur every
+        # 'max_string_length' characters apart.
+        self._index = [shift * max_string_length for shift in range(n_batch)]
+
+        # Initialize batches with strings of length 1.
+        # '_next_character' function is defined below.
+        self._initial_batch = self._next_character()
+
+    # Define function that "gets" the next character for each string in the batch.
+    def _next_character(self):
+
+        # Create array of zeros with 1 row for each string in the batch and
+        # 1 column for each character (a-z and space).
+        next_char = np.zeros(shape = (n_batch, (len(string.ascii_lowercase) + 1)),
+                             dtype = np.float)
+
+        # Loop through each string in the batch.
+        # Set column corresponding to the "index" character to 1.
+        for row in range(n_batch):
+
+            # Set appropriate row and column (corresponding to current character) to 1.
+            next_char[row, char_to_num(text[self._index[row]])] = 1.0
+
+            # Increment relevant value of 'self._index'.
+            self._index[row] = (self._index[row] + 1) % len(text)
+
+        # Return 'next_char'.
+        return(next_char)
+
+    # Define function that runs '_next_character' 'len_batch' times to
+    # generate a full batch of strings.
+    def full_batch(self):
+        
+    
+
 
 
 
