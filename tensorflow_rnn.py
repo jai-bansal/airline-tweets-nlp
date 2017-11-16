@@ -133,6 +133,8 @@ def num_to_char(id):
 #######################
 # This section defines functions used to create a training batch
 # for the LSTM model.
+# I refer to a batch as some number ('batch_size') of strings of length ('batch_length').
+# As opposed to referring to each character in the strings as a batch.
 # It defines a new Python class to do this.
 # This section is very specific to the Udacity example I learned from.
 
@@ -182,6 +184,25 @@ class BatchGenerator(object):
     # Define function that runs '_next_character' 'len_batch' times to
     # generate a full batch of strings.
     def full_batch(self):
+
+        # Start with initial character for each string in batch.
+        batch = [self._initial_batch]
+
+        # For 'len_batch' steps, add characters to 'batch' using the '_next_character' function.
+        for character in range(len_batch):
+
+            # Add characters to 'batch'.
+            batch.append(self._next_character())
+
+        # When done generating batch, reset 'self._initial_batch' to the last characters of 'batch'.
+        self._initial_batch = batch[-1]
+          
+        # Return complete batch of strings.
+        return(batch)
+
+################################################
+# CREATE FUNCTIONS TO TURN MODEL OUTPUTS TO TEXT
+################################################
         
     
 
