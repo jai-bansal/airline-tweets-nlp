@@ -165,12 +165,12 @@ class BatchGenerator(object):
 
         # Create array of zeros with 1 row for each string in the batch and
         # 1 column for each character (a-z and space).
-        next_char = np.zeros(shape = (n_batch, (len(string.ascii_lowercase) + 1)),
+        next_char = np.zeros(shape = (self._n_batch, (len(string.ascii_lowercase) + 1)),
                              dtype = np.float)
 
         # Loop through each string in the batch.
         # Set column corresponding to the "index" character to 1.
-        for row in range(n_batch):
+        for row in range(self._n_batch):
 
             # Set appropriate row and column (corresponding to current character) to 1.
             next_char[row, char_to_num(text[self._index[row]])] = 1.0
@@ -200,10 +200,39 @@ class BatchGenerator(object):
         # Return complete batch of strings.
         return(batch)
 
-################################################
-# CREATE FUNCTIONS TO TURN MODEL OUTPUTS TO TEXT
-################################################
-        
+###############################
+# CREATE OTHER HELPER FUNCTIONS
+###############################
+# This section defines some other functions that help with the RNN model.
+
+# The model outputs an array or bunch of arrays.
+# This function turns those outputs into text.
+# Define function to turn a 1-hot encoding or probability distribution
+# into the (most likely) character.
+def prob_dist_to_char(prob_dist):
+
+    # Given a probability distribution over characters,
+    # return the character corresponding to the column with the
+    # highest probability.
+    return[num_to_char(a) for a in np.argmax(prob_dist, 1)]
+
+# Define function to compute log probability of the true labels in a batch.
+# This value will help compute perplexity, a measure of how well the
+# model is performing.
+# 'batch' is a (n x v) matrix where each row is a probability distribution
+# on the next character in that string.
+# 'labels' is also (n x v), but is a 1-hot encoding of the actual next character
+# in each string (the answers).
+# Then, low probabilities for the actual next character get a higher error
+# than high probabilities for the actual next character.
+def logprob(batch, labels):
+
+    # Remove zero probabilities. I assume this is to avoid computing log(0).
+    batch[batch < 1e-10] = 1e-10
+
+    # Return the sum of negative log probabilities for the true
+    # next character for the entire batch.
+    return(np.sum(np.multiply(labels, -np.log(batch))) / labels.shape[0])
     
 
 
