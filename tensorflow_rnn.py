@@ -1,6 +1,7 @@
 # This script builds a recurrent neural network (RNN) model
 # for airline tweet data using the 'tensorflow' package.
 # Specifically, it builds a long short term memory (LSTM) model.
+# The goal of the model is to predict the next character in a string.
 
 ################
 # IMPORT MODULES
@@ -140,8 +141,7 @@ def num_to_char(id):
 #######################
 # CREATE TRAINING BATCH
 #######################
-# This section defines functions used to create a training batch
-# for the LSTM model.
+# This section defines functions used to create a training batch for the LSTM model.
 # I refer to a batch as some number ('batch_size') of strings of length ('batch_length').
 # As opposed to referring to each character in the strings as a batch.
 # It defines a new Python class to do this.
@@ -314,6 +314,7 @@ def random_distribution():
 # RUN MODEL
 ###########
 # This section runs the LSTM.
+# The goal of the model is to predict the next character in a string.
 
 # Set up graph.
 graph = tf.Graph()
@@ -329,14 +330,14 @@ with graph.as_default():
     fi = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # forget gate current input
     fp = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # forget gate previous output
     fb = tf.Variable(tf.zeros([1, nodes]))                                  # forget gate bias
-    
-    ii = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # input gate current input
-    ip = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # input gate previous output
-    ib = tf.Variable(tf.zeros([1, nodes]))                                  # input gate bias
 
     ci = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # candidate function current input
     cp = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # candidate function previous output
     cb = tf.Variable(tf.zeros([1, nodes]))                                  # candidate function bias
+
+    ii = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # input gate current input
+    ip = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # input gate previous output
+    ib = tf.Variable(tf.zeros([1, nodes]))                                  # input gate bias
 
     oi = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # output gate current input
     op = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # output gate previous output
@@ -354,10 +355,76 @@ with graph.as_default():
     # The setup below returns a probability distribution of length
     # 'nodes'. So, the variables below are necessary for the transform.
     # Why not set 'nodes' so the output has the correct dimensions?
-    # Not sure, but this is how the example I ripped from did it.
+    # Not sure, but this is how the Udacity example I ripped from did it.
     transform_weights = tf.Variable(tf.truncated_normal([nodes, vocab_size], -0.1, 0.1))
     transform_biases = tf.Variable(tf.zeros([vocab_size]))
-    
+
+    # Define function to execute LSTM matrix multiplications and other operations.
+    # http://colah.github.io/posts/2015-08-Understanding-LSTMs/ is a great resource.
+    def lstm_cell(current_input, previous_output, cell_state):
+
+        # Create forget gate.
+        forget_gate = tf.sigmoid(tf.matmul(current_input, fi) + tf.matmul(previous_output, fp) + fb)
+
+        # Create candidate input function.
+        candidate = tf.matmul(current_input, ci) + tf.matmul(previous_output, cp) + cb
+
+        # Create input gate.
+        input_gate = tf.sigmoid(tf.matmul(current_input, ii) + tf.matmul(previous_input, ip) + ib)
+
+        # Create output gate.
+        output_gate = tf.sigmoid(tf.matmul(current_input, oi) + tf.matmul(previous_input, op) + ob)
+
+        # Update cell state.
+        cell_state = (forget_gate * cell_state) + (input_gate * tf.tanh(candidate))
+
+        # Return the output and updated cell state.
+        return((output_gate * tf.tanh(cell_state)), cell_state)
+
+    # Create structure for training data.
+
+    # Create empty list for training data.
+    train_data = list()
+
+    # Fill 'train_data' with placeholders of appropriate dimensions.
+    # These will be filled in when the model runs with actual training data.
+    for _ in range(batch_length + 1):
+
+        # Add placeholders to 'train_data'.
+        train_data.append(tf.placeholder(tf.float32,
+                                         shape = [batch_size, vocab_size]))
+
+    # Define training data inputs (all characters in 'train_data' except the last one).
+    train_inputs = train_data[:batch_length]
+
+    # Define training data labels (all characters in 'train_data' except the first one).
+    train_labels = train_data[1:]
+
+    # Create empty list to hold LSTM outputs (predictions).
+    outputs = list()
+        
+    # Create variables to hold the previous output and current cell state.
+    # These seem redundant because of 'saved_output' and 'saved_state' above.
+    # But those 2 are only updated at the end of each batch.
+    # The 2 variables below are updated "iteration in, iteration out".
+    previous_output = saved_output
+    cell_state = saved_state
+
+    # Plug training data (defined above) into LSTM (computations also defined above).
+    # Update the output and cell state. Save results.
+    for i in train_inputs:
+
+        # Run LSTM cell and update 'previous_output' and 'cell_state'.
+        previous_output, cell_state = lstm_cell(i, previous_output, cell_state)
+
+        # Add LSTM output to 'outputs'.
+        outputs.append(previous_output))
+
+    # Compute loss. Before this, a few things must happen.
+
+    # Update 'saved_output' and 'saved_state' to be ready for the next batch.
+    # The setup below means that the updating will occur before the steps.
+    # Ugh lost it here.
 
     
     
