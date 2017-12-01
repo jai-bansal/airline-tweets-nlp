@@ -370,10 +370,10 @@ with graph.as_default():
         candidate = tf.matmul(current_input, ci) + tf.matmul(previous_output, cp) + cb
 
         # Create input gate.
-        input_gate = tf.sigmoid(tf.matmul(current_input, ii) + tf.matmul(previous_input, ip) + ib)
+        input_gate = tf.sigmoid(tf.matmul(current_input, ii) + tf.matmul(previous_output, ip) + ib)
 
         # Create output gate.
-        output_gate = tf.sigmoid(tf.matmul(current_input, oi) + tf.matmul(previous_input, op) + ob)
+        output_gate = tf.sigmoid(tf.matmul(current_input, oi) + tf.matmul(previous_output, op) + ob)
 
         # Update cell state.
         cell_state = (forget_gate * cell_state) + (input_gate * tf.tanh(candidate))
@@ -418,13 +418,80 @@ with graph.as_default():
         previous_output, cell_state = lstm_cell(i, previous_output, cell_state)
 
         # Add LSTM output to 'outputs'.
-        outputs.append(previous_output))
+        outputs.append(previous_output)
 
     # Compute loss. Before this, a few things must happen.
 
     # Update 'saved_output' and 'saved_state' to be ready for the next batch.
-    # The setup below means that the updating will occur before the steps.
-    # Ugh lost it here.
+    # The setup below means that the updating will occur before the 'logit' and 'loss' steps.
+    with tf.control_dependencies([saved_output.assign(previous_output),
+                                  saved_state.assign(cell_state)]):
+
+        # Recall from above that the model output has incorrect dimensions.
+        # Transform model output into correct dimensions.
+        # The 'concat' combines the 10 sets of 64 predictions and is also done
+        # for the training labels below. So 'final_outputs' has dimensions 640 x 27.
+        final_outputs = tf.nn.xw_plus_b(x = tf.concat(0, outputs),
+                                        weights = transform_weights,
+                                        biases = transform_biases)
+
+        # Compute loss. Note that the 10 sets of training labels are combined.
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf.concat(0, train_labels),
+                                                                      logits = final_outputs))
+
+    # Specify optimizer with decaying learning rate.
+
+    # Create a global step variable to track steps to help with the decaying learning rate.
+    global_step = tf.Variable(0)
+
+    # Specify exponentially decaying learning rate.
+    learning_rate = tf.train.exponential_decay(10.0,
+                                               global_step,
+                                               5000,
+                                               0.1,
+                                               staircase = True)
+
+    # Specify optimizer using 'learning_rate'.
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+
+    # Work with the gradients.
+    # Computation and application of gradients is done separately because
+    # the gradients are clipped between computation and application.
+    # Not sure of all the details in this section, but this works!
+
+    # Compute gradients.
+    gradients, variables = zip(*optimizer.compute_gradients(loss))
+
+    # Clip gradients.
+    gradients, _ = tf.clip_by_global_norm(gradients, 1.25)
+
+    # Apply clipped gradients to variables.
+    optimizer = optimizer.apply_gradients(zip(gradients, variables),
+                                          global_step = global_step)
+
+    # Generate predictions.
+    train_preds = tf.nn.softmax(final_outputs)
+
+    # Handle the generation of example text.
+    # The code below helps generate random sentences.
+    # This helps subjectively judge how well the model is doing.
+
+    # Define sample input (1 character).
+    sample_input = tf.placeholder(tf.float32,
+                                  shape = [1, vocab_size])
+
+    # For example text, set initial state and previous output to all zeros.
+    # In the Udacity example, there is NO 'trainable = False'.
+    # But I think it should be in there...these shouldn't be trained!
+    # 'saved_output' and 'saved_state' above have 'trainable = False'.
+    saved_sample_output = tf.Variable(tf.zeros([1, nodes]),
+                                      trainable = False)
+    saved_sample_state = tf.Variable(tf.zeros([1, nodes]),
+                                      trainable = False)
+
+    
+    
+    
 
     
     
