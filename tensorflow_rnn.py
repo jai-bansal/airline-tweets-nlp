@@ -90,6 +90,15 @@ batch_length = 10
 # Set the number of nodes to be used in the LSTM matrix multiplications.
 nodes = 64
 
+# Set number of steps to run LSTM model.
+steps = 100
+
+# Set step interval for printing loss.
+loss_interval = 100
+
+# Set step interval for printing example sentences.
+example_interval = 1000
+
 #######################
 # CREATE VALIDATION SET
 #######################
@@ -182,7 +191,7 @@ class BatchGenerator(object):
         for row in range(self._n_batch):
 
             # Set appropriate row and column (corresponding to current character) to 1.
-            next_char[row, char_to_num(text[self._index[row]])] = 1.0
+            next_char[row, char_to_num(self._text[self._index[row]])] = 1.0
 
             # Increment relevant value of 'self._index'.
             self._index[row] = (self._index[row] + 1) % len(text)
@@ -310,10 +319,10 @@ def random_distribution():
     # Return a normalized version of 'random_dist' so it's a probability distribution.
     return(random_dist / np.sum(random_dist, 1))
 
-###########
-# RUN MODEL
-###########
-# This section runs the LSTM.
+##############
+# SET UP GRAPH
+##############
+# This section sets up the graph for the LSTM.
 # The goal of the model is to predict the next character in a string.
 
 # Set up graph.
@@ -429,13 +438,14 @@ with graph.as_default():
 
         # Recall from above that the model output has incorrect dimensions.
         # Transform model output into correct dimensions.
-        # The 'concat' combines the 10 sets of 64 predictions and is also done
-        # for the training labels below. So 'final_outputs' has dimensions 640 x 27.
+        # The 'concat' combines the 'batch_length' sets of 'batch_size' predictions and is also done
+        # for the training labels below. So 'final_outputs' has dimensions
+        #('batch_size' x 'batch_length') x 'vocab_size'.
         final_outputs = tf.nn.xw_plus_b(x = tf.concat(0, outputs),
                                         weights = transform_weights,
                                         biases = transform_biases)
 
-        # Compute loss. Note that the 10 sets of training labels are combined.
+        # Compute loss. Note that the 'batch_length' sets of training labels are combined.
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf.concat(0, train_labels),
                                                                       logits = final_outputs))
 
@@ -489,9 +499,50 @@ with graph.as_default():
     saved_sample_state = tf.Variable(tf.zeros([1, nodes]),
                                       trainable = False)
 
-    
-    
-    
+    # Create an operation to reset 'saved_sample_output' and 'saved_sample_state'
+    # to zeros.
+    # This is used below after each set of 5 example sentences is printed.
+    reset_sample_output_and_state = tf.group(saved_sample_output.assign(tf.zeros([1, nodes])),
+                                             saved_sample_state.assign(tf.zeros([1, nodes])))
+
+    # Run a letter of the example text through the LSTM cell.
+    # I later generate a prediction for the next letter using the output of the LSTM cell.
+    sample_output, sample_cell_state = lstm_cell(sample_input, saved_sample_output, saved_sample_state)
+
+    # Generate prediction for the next character.
+    # But first update 'saved_sample_output' and 'saved_sample_state' for the next iteration.
+    sample_pred = tf.nn.softmax(tf.nn.xw_plus_b(x = sample_output,
+                                                weights = transform_weights,
+                                                biases = transform_biases))
+
+###########
+# RUN GRAPH
+###########
+# This section runs the graph for the LSTM model.
+
+# Create initial batch generation object.
+train_batches = BatchGenerator(train_text, 64, 10)
+  
+# Run graph.
+##with tf.Session(graph = graph) as session:
+##
+##    # Initialize variables.
+##    tf.global_variables_initializer().run()
+##
+##    # Initialize mean loss at 0.
+##    mean_loss = 0
+##
+##    # Iterate through steps.
+##    for step in steps:
+##
+##        # Generate training batch (arrays for '.
+##        batch = train_batches.next()
+##        print(type(batch))
+##
+##        # Create empty dictionary that will be populated and fed into LSTM model.
+##        feed_dict = dict()
+##
+##        #
 
     
     
