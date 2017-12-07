@@ -91,10 +91,10 @@ batch_length = 10
 nodes = 64
 
 # Set number of steps to run LSTM model.
-steps = 100
+steps = 10000
 
 # Set step interval for printing loss.
-loss_interval = 100
+loss_interval = 500
 
 # Set step interval for printing example sentences.
 example_interval = 1000
@@ -130,7 +130,7 @@ def char_to_num(character):
 
     # Map unexpected / unrecognized characters to 0 and print an alert.
     else:
-        print('Unrecognized Character: ' + character)
+        # print('Unrecognized Character: ' + character) # commented out to suppress output
         return(0)
 
 # Create function to map numeric IDs to characters (reverse of 'char_to_num').
@@ -207,7 +207,7 @@ class BatchGenerator(object):
         batch = [self._initial_batch]
 
         # For 'len_batch' steps, add characters to 'batch' using the '_next_character' function.
-        for character in range(len_batch):
+        for character in range(self._len_batch):
 
             # Add characters to 'batch'.
             batch.append(self._next_character())
@@ -524,25 +524,73 @@ with graph.as_default():
 train_batches = BatchGenerator(train_text, 64, 10)
   
 # Run graph.
-##with tf.Session(graph = graph) as session:
-##
-##    # Initialize variables.
-##    tf.global_variables_initializer().run()
-##
-##    # Initialize mean loss at 0.
-##    mean_loss = 0
-##
-##    # Iterate through steps.
-##    for step in steps:
-##
-##        # Generate training batch (arrays for '.
-##        batch = train_batches.next()
-##        print(type(batch))
-##
-##        # Create empty dictionary that will be populated and fed into LSTM model.
-##        feed_dict = dict()
-##
-##        #
+with tf.Session(graph = graph) as session:
+
+    # Initialize variables.
+    tf.global_variables_initializer().run()
+
+    # Initialize loss tracker at 0.
+    loss_tracker = 0
+
+    # Iterate through steps.
+    for step in range(steps):
+
+        # Generate training batch.
+        batch = train_batches.full_batch()
+
+        # Create empty dictionary that will be populated and fed into LSTM model.
+        feed_dict = dict()
+
+        # Populate 'feed_dict' with the elements of 'batch'.
+        for i in range(batch_length + 1):
+
+            feed_dict[train_data[i]] = batch[i]
+
+        # Run elements of 'batch' through the LSTM.
+        _, l, preds, lr = session.run([optimizer, loss, train_preds, learning_rate],
+                                      feed_dict = feed_dict)
+
+        # Add 'l' (loss from above) to 'loss_tracker'.
+        loss_tracker += l
+
+        # Every 'loss_interval' steps, report some metrics.
+        if step % loss_interval == 0:
+
+            # Print the average loss over the last 'loss_interval' steps.
+            print('Step', step, ':', 'Mean Loss =', round(loss_tracker / loss_interval, 3),
+                  'and', 'Learning Rate =', lr)
+
+            # Reset 'loss_tracker' to 0.
+            loss_tracker = 0
+
+            # Print batch perplexity.
+            # Perplexity is a measure of how well the model predicts
+            # a sample (lower is better).
+
+            # Get the labels from 'batch' (all elements except the 1st one).
+            batch_labels = np.concatenate(list(batch)[1:])
+
+            # Print batch perplexity ('logprob' is a function defined above).
+            print('Batch Perplexity: ',
+                  round(np.exp(logprob(preds, batch_labels)), 2))
+            print('')
+
+            # Every 'example_interval' steps, generate 5 sample sentences.
+            #if step % example_interval == 0:
+            
+                #print('')
+
+                #for _ in range(5):
+
+                #print('')
+
+            
+
+
+
+
+            
+        
 
     
     
