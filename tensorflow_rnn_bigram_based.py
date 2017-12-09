@@ -2,6 +2,8 @@
 # for airline tweet data using the 'tensorflow' package.
 # Specifically, it builds a long short term memory (LSTM) model.
 # The goal of the model is to predict the next character in a string.
+# The model in this script is trained over bigrams; it trains on
+# two previous characters to predict the next.
 
 ################
 # IMPORT MODULES
@@ -90,19 +92,21 @@ batch_length = 10
 # Set the number of nodes to be used in the LSTM matrix multiplications.
 nodes = 64
 
+# Set size (number of columns) of embeddings.
+embedding_size = 128
+
 # Set number of steps to run LSTM model.
-steps = 1000
+steps = 10000
 
 # Set step interval for printing loss.
 loss_interval = 500
 
 # Set step interval for printing example sentences.
-example_interval = 1000
+example_interval = 500
 
 #######################
 # CREATE VALIDATION SET
 #######################
-
 # Divide 'tf_string' into training and validation sets.
 valid_text = tf_string[:valid_size]
 train_text = tf_string[valid_size:]
@@ -330,6 +334,9 @@ def random_distribution():
 graph = tf.Graph()
 with graph.as_default():
 
+                                               minval = -1,
+                                               maxval = 1))
+
     # Create parameters. There are 3 gates: forget, input, and output
     # The input gate has a candidate function and input gate portion.
     # Each of the 4 things above has parameters for the current input,
@@ -337,21 +344,21 @@ with graph.as_default():
     # These are all trainable variables!
     # http://colah.github.io/posts/2015-08-Understanding-LSTMs/ is a great resource.
 
-    fi = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # forget gate current input
-    fp = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # forget gate previous output
-    fb = tf.Variable(tf.zeros([1, nodes]))                                  # forget gate bias
+    fi = tf.Variable(tf.truncated_normal([embedding_size, nodes], -0.1, 0.1))   # forget gate current input
+    fp = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))            # forget gate previous output
+    fb = tf.Variable(tf.zeros([1, nodes]))                                      # forget gate bias
 
-    ci = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # candidate function current input
-    cp = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # candidate function previous output
-    cb = tf.Variable(tf.zeros([1, nodes]))                                  # candidate function bias
+    ci = tf.Variable(tf.truncated_normal([embedding_size, nodes], -0.1, 0.1))   # candidate function current input
+    cp = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))            # candidate function previous output
+    cb = tf.Variable(tf.zeros([1, nodes]))                                      # candidate function bias
 
-    ii = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # input gate current input
-    ip = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # input gate previous output
-    ib = tf.Variable(tf.zeros([1, nodes]))                                  # input gate bias
+    ii = tf.Variable(tf.truncated_normal([embedding_size, nodes], -0.1, 0.1))   # input gate current input
+    ip = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))            # input gate previous output
+    ib = tf.Variable(tf.zeros([1, nodes]))                                      # input gate bias
 
-    oi = tf.Variable(tf.truncated_normal([vocab_size, nodes], -0.1, 0.1))   # output gate current input
-    op = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))        # output gate previous output
-    ob = tf.Variable(tf.zeros([1, nodes]))                                  # output gate bias
+    oi = tf.Variable(tf.truncated_normal([embedding_size, nodes], -0.1, 0.1))   # output gate current input
+    op = tf.Variable(tf.truncated_normal([nodes, nodes], -0.1, 0.1))            # output gate previous output
+    ob = tf.Variable(tf.zeros([1, nodes]))                                      # output gate bias
 
     # Create non-trainable variables to hold the output and state over time.
     # These are initially set to all zeros.
@@ -420,12 +427,17 @@ with graph.as_default():
     previous_output = saved_output
     cell_state = saved_state
 
-    # Plug training data (defined above) into LSTM (computations also defined above).
+    # Get the corresponding embedding for each training example (character).
+    # Plug embedding into LSTM (computations also defined above).
     # Update the output and cell state. Save results.
     for i in train_inputs:
 
+        # Get corresponding embedding for 'i'.
+        i_embedding = tf.nn.embedding_lookup(embeddings,
+                                             tf.argmax(i, dimension = 1))
+
         # Run LSTM cell and update 'previous_output' and 'cell_state'.
-        previous_output, cell_state = lstm_cell(i, previous_output, cell_state)
+        previous_output, cell_state = lstm_cell(i_embedding, previous_output, cell_state)
 
         # Add LSTM output to 'outputs'.
         outputs.append(previous_output)
@@ -487,9 +499,13 @@ with graph.as_default():
     # The code below helps generate random sentences.
     # This helps subjectively judge how well the model is doing.
 
-    # Define sample input (1 character).
+    # Define example input (1 character).
     example_input = tf.placeholder(tf.float32,
                                    shape = [1, vocab_size])
+
+    # Look up corresponding embedding for 'example_input'.
+    example_input_embedding = tf.nn.embedding_lookup(embeddings,
+                                                     tf.argmax(example_input, dimension = 1))
 
     # For example text, set initial state and previous output to all zeros.
     # In the Udacity example, there is NO 'trainable = False'.
@@ -504,19 +520,19 @@ with graph.as_default():
     # to zeros.
     # This is used below after each set of 5 example sentences is printed.
     reset_example_output_and_state = tf.group(saved_example_output.assign(tf.zeros([1, nodes])),
-                                             saved_example_cell_state.assign(tf.zeros([1, nodes])))
+                                              saved_example_cell_state.assign(tf.zeros([1, nodes])))
 
     # Run a letter of the example text through the LSTM cell.
     # I later generate a prediction for the next letter using the output of the LSTM cell.
-    example_output, example_cell_state = lstm_cell(example_input, saved_example_output, saved_example_cell_state)
+    example_output, example_cell_state = lstm_cell(example_input_embedding, saved_example_output, saved_example_cell_state)
 
     # Generate prediction for the next character.
     # But first update 'saved_example_output' and 'saved_example_state' for the next iteration.
     with tf.control_dependencies([saved_example_output.assign(example_output),
                                   saved_example_cell_state.assign(example_cell_state)]):
         example_pred = tf.nn.softmax(tf.nn.xw_plus_b(x = example_output,
-                                                    weights = transform_weights,
-                                                    biases = transform_biases))
+                                                     weights = transform_weights,
+                                                     biases = transform_biases))
 
 ###########
 # RUN GRAPH
@@ -578,9 +594,8 @@ with tf.Session(graph = graph) as session:
             batch_labels = np.concatenate(list(batch)[1:])
 
             # Print batch perplexity ('logprob' is a function defined above).
-            print('Batch Perplexity: ',
+            print('Batch Perplexity =',
                   round(np.exp(logprob(preds, batch_labels)), 2))
-            print('')
 
             # Print validation set perplexity.
 
@@ -600,14 +615,23 @@ with tf.Session(graph = graph) as session:
                 # Generate validation set batch.
                 valid_batch = valid_batches.full_batch()
 
-                # Generate prediction for next character.
+                # Generate prediction for next character using 'valid_batch[0]'
+                # as input.
                 valid_pred = example_pred.eval({example_input: valid_batch[0]})
+
+                # Compute the log probability between 'valid_pred' and the actual
+                # next character in the validation set (valid_batch[1]).
+                # Add this to 'valid_logprob_counter'.
+                valid_logprob_counter = valid_logprob_counter + logprob(valid_pred, valid_batch[1])
+
+            # Print validation set perplexity.
+            print('Validation Set Perplexity = ',
+                  round(np.exp(valid_logprob_counter / valid_size), 2))
+            print('')
 
             # Every 'example_interval' steps, generate 5 sample sentences.
             if step % example_interval == 0:
             
-                print('')
-
                 # One iteration for each sentence.
                 for _ in range(5):
 
@@ -645,7 +669,6 @@ with tf.Session(graph = graph) as session:
                         example_sentence += prob_dist_to_char(letter_one_hot)[0]
 
                     # Print 'example_sentence'.
-                    print('')
                     print(example_sentence)
 
                 print('')
