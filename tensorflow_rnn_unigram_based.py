@@ -646,7 +646,7 @@ with tf.Session(graph = graph) as session:
                     # 'random_distribution' and 'prob_dist_to_one_hot' are
                     # functions defined above. The 1st function creates a
                     # random distribution and the 2nd function samples from it.
-                    # 'letter' is a one-hot vector.
+                    # 'letter_one_hot' is a one-hot vector.
                     # This uses the same general mechanism used for computing
                     # validation set perplexity.
                     letter_one_hot = prob_dist_to_one_hot(random_distribution())
