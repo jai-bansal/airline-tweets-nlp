@@ -1,6 +1,7 @@
 # This script builds a recurrent neural network (RNN) model
 # for airline tweet data using the 'tensorflow' package.
 # Specifically, it builds a long short term memory (LSTM) model.
+# The LSTM model below includes dropout.
 # The goal of the model is to predict the next character in a string.
 # The model in this script is trained over bigrams; it trains on
 # two previous characters to predict the next.
@@ -16,6 +17,7 @@ import string
 import tensorflow as tf
 import numpy as np
 import random
+import collections
 
 #############
 # IMPORT DATA
@@ -334,6 +336,8 @@ def random_distribution():
 graph = tf.Graph()
 with graph.as_default():
 
+    # Create embeddings (1 embedding for every 2-character combo in the vocabulary).
+    embeddings = tf.Variable(tf.random_uniform(shape = [(vocab_size * vocab_size), embedding_size],
                                                minval = -1,
                                                maxval = 1))
 
@@ -411,11 +415,17 @@ with graph.as_default():
         train_data.append(tf.placeholder(tf.float32,
                                          shape = [batch_size, vocab_size]))
 
-    # Define training data inputs (all characters in 'train_data' except the last one).
-    train_inputs = train_data[:batch_length]
+    # Specify all characters used in training inputs
+    # (all characters except the last one in 'train_data').
+    # This is used to create a training input for the bigram-based model.
+    all_train_input_chars = train_data[:batch_length]
 
-    # Define training data labels (all characters in 'train_data' except the first one).
-    train_labels = train_data[1:]
+    # Specify training data labels (all characters in 'train_data' except the first 2).
+    train_labels = train_data[2:]
+
+    # Specify actual training inputs.
+    # These are 2 characters since this is a bigram-based model.
+    train_inputs = zip(all_train_input_chars[:-1], all_train_input_chars[1:])
 
     # Create empty list to hold LSTM outputs (predictions).
     outputs = list()
@@ -432,9 +442,11 @@ with graph.as_default():
     # Update the output and cell state. Save results.
     for i in train_inputs:
 
+        # Get the index of the relevant bigram embedding.
+        bigram_index = tf.argmax(i[0], dimension = 1) + (vocab_size * tf.argmax(i[1], dimension = 1))
+
         # Get corresponding embedding for 'i'.
-        i_embedding = tf.nn.embedding_lookup(embeddings,
-                                             tf.argmax(i, dimension = 1))
+        i_embedding = tf.nn.embedding_lookup(embeddings, bigram_index)
 
         # Run LSTM cell and update 'previous_output' and 'cell_state'.
         previous_output, cell_state = lstm_cell(i_embedding, previous_output, cell_state)
@@ -499,13 +511,20 @@ with graph.as_default():
     # The code below helps generate random sentences.
     # This helps subjectively judge how well the model is doing.
 
-    # Define example input (1 character).
-    example_input = tf.placeholder(tf.float32,
-                                   shape = [1, vocab_size])
+    # Create empty list to hold example placeholder elements.
+    example_input = list()
 
-    # Look up corresponding embedding for 'example_input'.
+    # Fill 'example_input' with 2 placeholders.
+    for _ in range(2):
+        example_input.append(tf.placeholder(tf.float32,
+                                            shape = [1, vocab_size]))
+
+    # Look up index of bigram embedding corresponding to 'example_input'.
+    example_bigram_index = tf.argmax(example_input[0], dimension = 1) + (vocab_size * tf.argmax(example_input[1], dimension = 1))
+
+    # Get bigram embedding corresponding to 'example_input'.
     example_input_embedding = tf.nn.embedding_lookup(embeddings,
-                                                     tf.argmax(example_input, dimension = 1))
+                                                     example_bigram_index)
 
     # For example text, set initial state and previous output to all zeros.
     # In the Udacity example, there is NO 'trainable = False'.
@@ -543,7 +562,7 @@ with graph.as_default():
 train_batches = BatchGenerator(train_text, 64, 10)
 
 # Create validation set batch object.
-valid_batches = BatchGenerator(valid_text, 1, 1)
+valid_batches = BatchGenerator(valid_text, 1, 2)
   
 # Run graph.
 with tf.Session(graph = graph) as session:
@@ -590,8 +609,8 @@ with tf.Session(graph = graph) as session:
             # Perplexity is a measure of how well the model predicts
             # a sample (lower is better).
 
-            # Get the labels from 'batch' (all elements except the 1st one).
-            batch_labels = np.concatenate(list(batch)[1:])
+            # Get the labels from 'batch' (all elements except the first 2).
+            batch_labels = np.concatenate(list(batch)[2:])
 
             # Print batch perplexity ('logprob' is a function defined above).
             print('Batch Perplexity =',
@@ -616,13 +635,14 @@ with tf.Session(graph = graph) as session:
                 valid_batch = valid_batches.full_batch()
 
                 # Generate prediction for next character using 'valid_batch[0]'
-                # as input.
-                valid_pred = example_pred.eval({example_input: valid_batch[0]})
+                # and 'valid_batch[1]' as inputs.
+                valid_pred = example_pred.eval({example_input[0]: valid_batch[0],
+                                                example_input[1]: valid_batch[1]})
 
                 # Compute the log probability between 'valid_pred' and the actual
-                # next character in the validation set (valid_batch[1]).
+                # next character in the validation set (valid_batch[2]).
                 # Add this to 'valid_logprob_counter'.
-                valid_logprob_counter = valid_logprob_counter + logprob(valid_pred, valid_batch[1])
+                valid_logprob_counter = valid_logprob_counter + logprob(valid_pred, valid_batch[2])
 
             # Print validation set perplexity.
             print('Validation Set Perplexity = ',
@@ -640,33 +660,39 @@ with tf.Session(graph = graph) as session:
                     # and 'saved_sample_cell_state' to zeros.
                     reset_example_output_and_state.run()
 
-                    # Randomly generate 1st letter of sentence.
+                    # Create an object to hold the 1st 2 random letters of the generated sentence.
+                    letters_one_hot = collections.deque(maxlen = 2)
+
+                    # Randomly generate 1st 2 letters of sentence.
                     # 'random_distribution' and 'prob_dist_to_one_hot' are
                     # functions defined above. The 1st function creates a
                     # random distribution and the 2nd function samples from it.
-                    # 'letter' is a one-hot vector.
+                    # 'letters_one_hot[0]' is a one-hot vector.
                     # This uses the same general mechanism used for computing
                     # validation set perplexity.
-                    letter_one_hot = prob_dist_to_one_hot(random_distribution())
+                    for _ in range(2):
+                        letters_one_hot.append(prob_dist_to_one_hot(random_distribution()))
 
-                    # Start the sentence. 'letter_one_hot' is a one-hot vector
-                    # and must be turned into an actual letter.
-                    example_sentence = prob_dist_to_char(letter_one_hot)[0]
+                    # Start the sentence. 'letters_one_hot[0]' and 'letters_one_hot[1]' are one-hot vectors
+                    # and must be turned into an actual letters.
+                    example_sentence = prob_dist_to_char(letters_one_hot[0])[0] + prob_dist_to_char(letters_one_hot[1])[0]
 
                     # Generate 79 more characters for the sentence.
                     for _ in range(79):
 
-                        # Generate 'example_pred' by using 'letter_one_hot' as
-                        # the input to the LSTM. Save output and cell state and
+                        # Generate 'example_pred' by using 'letters_one_hot' as
+                        # the inputs to the LSTM. Save output and cell state and
                         # keep iterating to generate new letters for the example sentence.
-                        next_letter_distribution = example_pred.eval({example_input: letter_one_hot})
+                        next_letter_distribution = example_pred.eval({example_input[0]: letters_one_hot[0],
+                                                                      example_input[1]: letters_one_hot[1]})
 
-                        # Update 'letter_one_hot'.
-                        # 'next_letter_distribution' is a probability distribution over characters.
-                        letter_one_hot = prob_dist_to_one_hot(next_letter_distribution)
+                        # Add the generated letter to 'letters_one_hot'.
+                        # The 'collections' object automatically throws out the 1st entry
+                        # when I used 'append'.
+                        letters_one_hot.append(prob_dist_to_one_hot(next_letter_distribution))
 
-                        # Add 'letter_one_hot' in letter form to 'example_sentence'.
-                        example_sentence += prob_dist_to_char(letter_one_hot)[0]
+                        # Add 'letters_one_hot[1]' in letter form to 'example_sentence'.
+                        example_sentence += prob_dist_to_char(letters_one_hot[1])[0]
 
                     # Print 'example_sentence'.
                     print(example_sentence)
