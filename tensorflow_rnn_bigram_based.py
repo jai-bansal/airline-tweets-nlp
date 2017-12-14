@@ -1,7 +1,10 @@
 # This script builds a recurrent neural network (RNN) model
 # for airline tweet data using the 'tensorflow' package.
 # Specifically, it builds a long short term memory (LSTM) model.
-# The LSTM model below includes dropout.
+# The LSTM model below applies dropout to the embeddings going into the LSTM
+# and the final output (right before the loss is computed).
+# I personally think it's strange to execute dropout in the 2nd case,
+# but I found it in 2 example scripts.
 # The goal of the model is to predict the next character in a string.
 # The model in this script is trained over bigrams; it trains on
 # two previous characters to predict the next.
@@ -96,6 +99,9 @@ nodes = 64
 
 # Set size (number of columns) of embeddings.
 embedding_size = 128
+
+# Set dropout probability.
+drop_prob = 0.95
 
 # Set number of steps to run LSTM model.
 steps = 10000
@@ -448,8 +454,11 @@ with graph.as_default():
         # Get corresponding embedding for 'i'.
         i_embedding = tf.nn.embedding_lookup(embeddings, bigram_index)
 
+        # Execute dropout on 'i_embedding'.
+        drop_embedding = tf.nn.dropout(i_embedding, drop_prob)
+
         # Run LSTM cell and update 'previous_output' and 'cell_state'.
-        previous_output, cell_state = lstm_cell(i_embedding, previous_output, cell_state)
+        previous_output, cell_state = lstm_cell(drop_embedding, previous_output, cell_state)
 
         # Add LSTM output to 'outputs'.
         outputs.append(previous_output)
@@ -470,9 +479,13 @@ with graph.as_default():
                                         weights = transform_weights,
                                         biases = transform_biases)
 
+        # Execute dropout on 'final_output's.
+        # I personally think it's strange to execute dropout here, but I found it in 2 example scripts.
+        drop_outputs = tf.nn.dropout(final_outputs, drop_prob)
+
         # Compute loss. Note that the 'batch_length' sets of training labels are combined.
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf.concat(0, train_labels),
-                                                                      logits = final_outputs))
+                                                                      logits = drop_outputs))
 
     # Specify optimizer with decaying learning rate.
 
