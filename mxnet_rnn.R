@@ -52,18 +52,12 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   text = trimws(text, 
                 which = 'both')   # trim leading and trailing whitespace
   text = gsub('  ', ' ', text)  # replace double spaces with single spaces
-
-  
-  
-  
-  
-  
     
 # SET MODEL PARAMETERS ----------------------------------------------------
 
   # Set model parameters.
   # Will figure these out over time.
-  batch.size = 32             # guess: batch size
+  batch_size = 32             # batch size
   
   seq.len = 32                # educated guess: length of each string in a batch
   # Set length of each string in the batch (in characters).
@@ -77,7 +71,6 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   wd = 0.00001
   clip_gradient=1
   update.period = 1
-  
 
 # CREATE CHARACTER / ID DICTIONARIES ---------------------------------------------
 # This section creates 2 dictionaries.
@@ -92,7 +85,7 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   # The names of this dictionary are characters.
   
     # Create empty dictionary.
-    word_id_dict = list()
+    char_id_dict = list()
     
     # Set initial dictionary ID (1).
     dict_id = 1
@@ -101,50 +94,47 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
     # The corresponding value is an increasing ID.
     for (letter in letters) 
       
-    {
-      
-      # Add 'letter' to 'word_id_dict' with corresponding and increasing 'dict_id'.
-      word_id_dict[[letter]] = dict_id
-      
-      # Increment 'dict_id' by 1.
-      dict_id = dict_id + 1
-      
-    }
+      {
+        
+        # Add 'letter' to 'char_id_dict' with corresponding and increasing 'dict_id'.
+        char_id_dict[[letter]] = dict_id
+        
+        # Increment 'dict_id' by 1.
+        dict_id = dict_id + 1
+        
+      }
     
-    # Add entry to 'word_id_dict' for space and increment 'dict_id'.
-    word_id_dict[[' ']] = dict_id
+    # Add entry to 'char_id_dict' for space and increment 'dict_id'.
+    char_id_dict[[' ']] = dict_id
     dict_id = dict_id + 1
     
-    # Add entry to 'word_id_dict' for all other characters.
-    word_id_dict[['other']] = dict_id
+    # Add entry to 'char_id_dict' for all other characters.
+    char_id_dict[['other']] = dict_id
     
   # Create ID to word dictionary.
   # The names of this dictionary are numeric IDs.
     
     # Create empty dictionary.
-    id_word_dict = list()
+    id_char_dict = list()
     
-    # Loop through the names of 'word_id_dict' (characters).
-    for (char in names(word_id_dict))
+    # Loop through the names of 'char_id_dict' (characters).
+    for (char in names(char_id_dict))
     
       {
       
-        # Get the value corresponding to the name 'char' in 'word_id_dict'.
-        id = word_id_dict[[char]]
+        # Get the value corresponding to the name 'char' in 'char_id_dict'.
+        id = char_id_dict[[char]]
         
-        # Create an element in 'id_word_dict' with name 'id' and value 'char'.
-        id_word_dict[[id]] = char
+        # Create an element in 'id_char_dict' with name 'id' and value 'char'.
+        id_char_dict[[id]] = char
         
       }
-
-    
-
 
 # PUT TEXT DATA INTO NUMERIC ARRAY ----------------------------------------
 # This section puts the text data into a numeric array.
 # The number of rows is the length of each string in a batch.
 # The number of columns is the number of strings that can fit into the text.
-# The value can be computed based on the length of each string and the 
+# That value can be computed based on the length of each string and the 
 # length of the text.
 
   # Split 'text' by character.
@@ -164,7 +154,7 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   # Fill in 'text_array' with the appropriate integer for each character.
   
     # Set initial text index to 1.
-    # I will loop through every character of 'text'.
+    # I will loop through every character in 'text'.
     text_index = 1
   
     # Loop through each string.
@@ -173,40 +163,34 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
       {
       
         # Print progress.
-        if (string %% 30000 == 0)
-          
-          {
-          
-            print(string)
-          
-          }
+        if (string %% 30000 == 0) {print(string)}
         
-        # Loop each character of each string.
+        # Loop through each character of each string.
         for (char in 1:batch_length)
           
           {
           
-            # If the 'text_index' character of 'text' is in 'word_id_dict', 
+            # If the 'text_index' character of 'text' is in 'char_id_dict', 
             # change the corresponding entry in 'text_array' to the corresponding 
-            # 'word_id_dict' value.
-            if (text[text_index] %in% names(word_id_dict))
+            # 'char_id_dict' value (a number).
+            if (text[text_index] %in% names(char_id_dict))
               
               {
                 
                 # Update corresponding entry of 'text_array'.
-                text_array[char, string] = word_id_dict[[text[text_index]]]
+                text_array[char, string] = char_id_dict[[text[text_index]]]
               
               }
           
-            # If the 'text_index' character of 'text is NOT in 'word_id_dict', 
+            # If the 'text_index' character of 'text' is NOT in 'char_id_dict', 
             # change the corresponding entry in 'text_array' to the value 
-            # corresponding to 'other' in 'word_id_dict'.
+            # corresponding to 'other' in 'char_id_dict'.
             else 
               
               {
               
                 # Update corresponding entry of 'text_array'.
-                text_array[char, string] = word_id_dict[['other']]
+                text_array[char, string] = char_id_dict[['other']]
                 
               }
           
@@ -216,5 +200,71 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
           }
       
       }
+
+  # Make 'text_array' such that it is divisible by 'batch_size' with no remainder.
+  # This informs the number of steps the model can run without repeat.
+  
+    # Compute the number of batches contained in 'text'.
+    batches = floor(ncol(text_array) / batch_size)
+    
+    # Trim 'text_array' so it contains a number of columns (batches) that can 
+    # be divided by 'batch_size' with no remainder.
+    text_array = text_array[, 1:(batch_size * batches)]
+    
+# GET LABELS --------------------------------------------------------------
+# This section gets labels corresponding to the values in 'text_array'.
+# The labels are generally the same values as 'text_array' shifted by 1 position.
+    
+  # Get variables for the rows and columns in 'text_array'.
+  rows = dim(text_array)[1]
+  cols = dim(text_array)[2]
+    
+  # Create array to hold labels.
+  labels = array(0, 
+                 dim = dim(text_array))
+    
+  # Fill in 'labels'.
+  # Loop through columns.
+  for (col in 0:(cols - 1))
+    
+    {
+      
+      # Keep track of loop progress.
+      if (col %% 20000 == 0) {print(col)}
+    
+      # Loop through rows.
+      for (row in 1:rows)
+        
+        {
+          
+          # Fill in 'labels'.
+          # The value of 'labels' is the corresponding position in 'text_array' shifted by 1 position.
+          labels[(col * rows) + row] = text_array[((col * rows) + row) %% (rows * cols)  + 1] 
+          
+        }
+      
+    }
+    
+# CREATE TRAINING AND VALIDATION SETS -------------------------------------
+# This section creates the training and validation sets.
+# I use roughly an 80/20 training/validation split.
+# It's not exactly 80/20 because I make sure both the training and validation sets
+# have exactly enough characters to complete a batch.
+  
+  # Get training and validation set input data.
+  train_data = text_array[, 1 : floor(0.8 * ncol(text_array))]
+  val_data = text_array[, ceiling(0.8 * ncol(text_array)) : ncol(text_array)]
+  
+  # Get training and validation set labels.
+  train_labels = labels[, 1 : floor(0.8 * ncol(text_array))]
+  val_labels = labels[, ceiling(0.8 * ncol(text_array)) : ncol(text_array)]
+  
+  # Combine input data and labels in lists for training and validation data.
+  train_list = list(data = train_data, 
+                    labels = train_labels)
+  val_list = list(data = val_data, 
+                  labels = val_labels)
+  
+  
 
     
