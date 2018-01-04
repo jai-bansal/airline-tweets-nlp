@@ -54,23 +54,25 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   text = gsub('  ', ' ', text)  # replace double spaces with single spaces
     
 # SET MODEL PARAMETERS ----------------------------------------------------
+# Enter '?mx.lstm' to find the descriptions of parameters used below.
+# Strangely, I can't find the help file online...
 
-  # Set model parameters.
-  # Will figure these out over time.
+  # Set model parameters
   batch_size = 32             # batch size
-  
-  seq.len = 32                # educated guess: length of each string in a batch
-  # Set length of each string in the batch (in characters).
-  batch_length = 10
-  
-  num.hidden = 16             # guess: # of hidden nodes
-  num.embed = 16
-  num.lstm.layer = 1
-  num.round = 1
-  learning.rate= 0.1          # guess: RNN learning rate
-  wd = 0.00001
-  clip_gradient=1
-  update.period = 1
+  batch_length = 10           # length of each string in input (in characters)
+  nodes = 16                  # number of hidden nodes
+                              # I think this corresponds to 'nodes' in the Python RNN script
+  embedding_size = 16         # the output dim of embedding
+                              # I think this corresponds to 'embedding_size' in the Python RNN script
+                              # So, the number of columns in the embedding matrix
+  num_lstm_layer = 1          # From documentation: the number of the layer of LSTM
+                              # I guess you could have multiple LSTM cell layers?
+                              # In that case, this parameter would control how many?
+                              # Not too clear on what this parameter does...
+  num_round = 1               # number of iterations of the training data to train the model
+  learning_rate = 0.1         # Assumption: set learning rate for optimizer (same as 'learning_rate' in Python RNN).
+                              # Note that the learning rate in the Python RNN was decaying.
+  clip_gradient = 1           # couldn't find in documentation
 
 # CREATE CHARACTER / ID DICTIONARIES ---------------------------------------------
 # This section creates 2 dictionaries.
@@ -264,6 +266,25 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
                     labels = train_labels)
   val_list = list(data = val_data, 
                   labels = val_labels)
+  
+# TRAIN MODEL -------------------------------------------------------------
+# This section trains the LSTM.
+# This seems very fragile...changing parameters can make the model return nonsense.
+# Removing arguments that are specified by default can make the model return nonsense.
+# NLL seems like some kind of error as it decreases.
+# I assume 'Perp' is perplexity.
+model = mx.lstm(train.data = train_list, 
+               eval.data = val_list,
+               num.round = num_round,
+               num.lstm.layer = num_lstm_layer,
+               seq.len = batch_length,
+               num.hidden = nodes,
+               num.embed = embedding_size,
+               num.label = length(char_id_dict),
+               batch.size = batch_size,
+               input.size = length(char_id_dict),
+               learning.rate = learning_rate,
+               clip_gradient = clip_gradient)
   
   
 
