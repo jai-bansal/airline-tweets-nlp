@@ -59,7 +59,7 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
 
   # Set model parameters
   batch_size = 32             # batch size
-  batch_length = 10           # length of each string in input (in characters)
+  batch_length = 32           # length of each string in input (in characters)
   nodes = 16                  # number of hidden nodes
                               # I think this corresponds to 'nodes' in the Python RNN script
   embedding_size = 16         # the output dim of embedding
@@ -72,7 +72,6 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   num_round = 1               # number of iterations of the training data to train the model
   learning_rate = 0.1         # Assumption: set learning rate for optimizer (same as 'learning_rate' in Python RNN).
                               # Note that the learning rate in the Python RNN was decaying.
-  clip_gradient = 1           # couldn't find in documentation
 
 # CREATE CHARACTER / ID DICTIONARIES ---------------------------------------------
 # This section creates 2 dictionaries.
@@ -132,6 +131,80 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
         
       }
 
+
+# CREATE FUNCTION TO SAMPLE FROM PROBABILITY DISTRIBUTION -----------------
+# This section creates a function to sample the index from a probability distribution.
+# So for the probability distribution (0.3, 0.2, 0.5), the function
+# would return 1 30% of the time, 2 20% of the time, and 3 50% of the time.
+    
+  # Create helper function to turn a probability distribution into a cumulative
+  # distribution function.
+    
+  # Turn PDF into CDF
+  pdf_to_cdf = function(prob_dist) 
+    
+    {
+    
+      # Sum all probabilities in 'prob_dist'.
+      # I guess this works for non-normalized probability distributions that don't add up to 1.
+      total_prob = sum(prob_dist)
+      
+      # Create empty vector for result.
+      cdf = c()
+      
+      
+      cumsum <- 0
+      for (prob in prob_dist) 
+        
+        {
+        
+          cumsum = cumsum + prob
+          result = c(result, cumsum / total)
+        
+        }
+      
+      return(result)
+    
+    }
+  
+  # Find how far along CDF you must go to find value greater than 'x'.
+  # 0 <= x <= 1
+  search.val <- function(cdf, x) {
+    l <- 1
+    #print(paste0('initial l: ', l))
+    r <- length(cdf)
+    #print(paste0('initial r: ', r))
+    
+    while (l <= r) {
+      m <- as.integer((l+r)/2)
+      #print(paste0('m: ', m))
+      #print(paste0('cdf[m]: ', cdf[m]))
+      #print('')
+      
+      if (cdf[m] < x) {
+        l <- m+1
+        #print('cdf[m] < x')
+        #print(paste0('l update: ', l))
+        #print('')
+      } else {
+        #print('cdf[m] >= x')
+        r <- m-1
+        #print(paste0('r update: ', r))
+        #print('') 
+      }  }
+    return (l)}
+  
+  # Randomly sample index from prob dist according to probs.
+  choice <- function(weights) {
+    cdf.vals <- cdf(as.array(weights))
+    x <- runif(1)
+    idx <- search.val(cdf.vals, x)
+    return (idx)
+  }
+    
+    
+    
+
 # PUT TEXT DATA INTO NUMERIC ARRAY ----------------------------------------
 # This section puts the text data into a numeric array.
 # The number of rows is the length of each string in a batch.
@@ -175,24 +248,32 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
             # If the 'text_index' character of 'text' is in 'char_id_dict', 
             # change the corresponding entry in 'text_array' to the corresponding 
             # 'char_id_dict' value (a number).
+            # Subtracting 1 below means the values in 'text_array' run from 0 to 27, 
+            # instead of 1 to 28. This is apparently key, as the model returns a lot 
+            # of 'Inf' and 'NaN' values without this step.
+            # Why? Not sure. Maybe because it relies on a Python implementation and Python is zero-indexed??
             if (text[text_index] %in% names(char_id_dict))
               
               {
                 
                 # Update corresponding entry of 'text_array'.
-                text_array[char, string] = char_id_dict[[text[text_index]]]
+                text_array[char, string] = char_id_dict[[text[text_index]]] - 1
               
               }
           
             # If the 'text_index' character of 'text' is NOT in 'char_id_dict', 
             # change the corresponding entry in 'text_array' to the value 
             # corresponding to 'other' in 'char_id_dict'.
+            # Subtracting 1 below means the values in 'text_array' run from 0 to 27, 
+            # instead of 1 to 28. This is apparently key, as the model returns a lot 
+            # of 'Inf' and 'NaN' values without this step.
+            # Why? Not sure. Maybe because it relies on a Python implementation and Python is zero-indexed??
             else 
               
               {
               
                 # Update corresponding entry of 'text_array'.
-                text_array[char, string] = char_id_dict[['other']]
+                text_array[char, string] = char_id_dict[['other']] - 1
                 
               }
           
@@ -273,19 +354,29 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
 # Removing arguments that are specified by default can make the model return nonsense.
 # NLL seems like some kind of error as it decreases.
 # I assume 'Perp' is perplexity.
-model = mx.lstm(train.data = train_list, 
-               eval.data = val_list,
-               num.round = num_round,
-               num.lstm.layer = num_lstm_layer,
-               seq.len = batch_length,
-               num.hidden = nodes,
-               num.embed = embedding_size,
-               num.label = length(char_id_dict),
-               batch.size = batch_size,
-               input.size = length(char_id_dict),
-               learning.rate = learning_rate,
-               clip_gradient = clip_gradient)
+model = mx.lstm(train_list, val_list,
+                 num.round = num_round,
+                 num.lstm.layer = num_lstm_layer,
+                 seq.len = batch_length,
+                 num.hidden = nodes,
+                 num.embed = embedding_size,
+                 num.label = length(char_id_dict),
+                 batch.size = batch_size,
+                 input.size = length(char_id_dict),
+                 initializer = mx.init.uniform(0.1),
+                 learning.rate = learning_rate)
   
   
 
     
+# GENERATE NEW TEXT BASED ON LSTM -----------------------------------------
+# This section generates new text based on the LSTM.
+
+  # Build inference from the model.
+  # 'mxnet' is high level...this just seems like magic.
+  model_inference = mx.lstm.inference(num.lstm.layer = num_lstm_layer,
+                                      input.size = length(char_id_dict),
+                                      num.hidden = nodes,
+                                      num.embed = embedding_size,
+                                      num.label = length(char_id_dict),
+                                      arg.params = model$arg.params)
