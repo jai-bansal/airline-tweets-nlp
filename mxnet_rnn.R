@@ -59,19 +59,20 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
 
   # Set model parameters
   batch_size = 32             # batch size
-  batch_length = 32           # length of each string in input (in characters)
-  nodes = 16                  # number of hidden nodes
+  batch_length = 16           # length of each string in input (in characters)
+  nodes = 32                  # number of hidden nodes
                               # I think this corresponds to 'nodes' in the Python RNN script
-  embedding_size = 16         # the output dim of embedding
+  embedding_size = 64         # the output dim of embedding
                               # I think this corresponds to 'embedding_size' in the Python RNN script
                               # So, the number of columns in the embedding matrix
   num_lstm_layer = 1          # From documentation: the number of the layer of LSTM
                               # I guess you could have multiple LSTM cell layers?
                               # In that case, this parameter would control how many?
                               # Not too clear on what this parameter does...
-  num_round = 1               # number of iterations of the training data to train the model
+  num_round = 2               # number of iterations of the training data to train the model
   learning_rate = 0.1         # Assumption: set learning rate for optimizer (same as 'learning_rate' in Python RNN).
                               # Note that the learning rate in the Python RNN was decaying.
+  char_to_generate = 80       # how many characters to generate when projecting forward with the model
 
 # CREATE CHARACTER / ID DICTIONARIES ---------------------------------------------
 # This section creates 2 dictionaries.
@@ -131,7 +132,6 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
         
       }
 
-
 # CREATE FUNCTION TO SAMPLE FROM PROBABILITY DISTRIBUTION -----------------
 # This section creates a function to sample the index from a probability distribution.
 # So for the probability distribution (0.3, 0.2, 0.5), the function
@@ -139,72 +139,88 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
     
   # Create helper function to turn a probability distribution into a cumulative
   # distribution function.
-    
-  # Turn PDF into CDF
   pdf_to_cdf = function(prob_dist) 
     
     {
     
       # Sum all probabilities in 'prob_dist'.
-      # I guess this works for non-normalized probability distributions that don't add up to 1.
+      # I guess this function works for non-normalized probability distributions that don't add up to 1.
       total_prob = sum(prob_dist)
       
-      # Create empty vector for result.
+      # Create empty vector for resulting CDF.
       cdf = c()
       
+      # Create variable that will hold each value of the CDF (one at a time).
+      cdf_element = 0
       
-      cumsum <- 0
+      # Iterate through probabilities in 'prob_dist'.
+      # Add the probability distribution element to 'cdf_element'.
+      # Divide that value by 'total_prob' and add to 'cdf'.
       for (prob in prob_dist) 
         
         {
         
-          cumsum = cumsum + prob
-          result = c(result, cumsum / total)
+          cdf_element = cdf_element + prob
+          cdf = c(cdf, cdf_element / total_prob)
         
         }
       
-      return(result)
+      return(cdf)
     
     }
   
-  # Find how far along CDF you must go to find value greater than 'x'.
-  # 0 <= x <= 1
-  search.val <- function(cdf, x) {
-    l <- 1
-    #print(paste0('initial l: ', l))
-    r <- length(cdf)
-    #print(paste0('initial r: ', r))
+  # Create helper function that, given a value of 'x' between 0 and 1, 
+  # returns the index of the smallest element of 'cdf' such that 'cdf >= x'.
+  # This function is pretty unintuitive on its own, but is used below 
+  # to help randomly sample an index from a probability distribution.
+  search = function(cdf, cutoff) 
     
-    while (l <= r) {
-      m <- as.integer((l+r)/2)
-      #print(paste0('m: ', m))
-      #print(paste0('cdf[m]: ', cdf[m]))
-      #print('')
-      
-      if (cdf[m] < x) {
-        l <- m+1
-        #print('cdf[m] < x')
-        #print(paste0('l update: ', l))
-        #print('')
-      } else {
-        #print('cdf[m] >= x')
-        r <- m-1
-        #print(paste0('r update: ', r))
-        #print('') 
-      }  }
-    return (l)}
+    {
+    
+      smallest_index = 1
+      r = length(cdf)
   
-  # Randomly sample index from prob dist according to probs.
-  choice <- function(weights) {
-    cdf.vals <- cdf(as.array(weights))
-    x <- runif(1)
-    idx <- search.val(cdf.vals, x)
-    return (idx)
-  }
+      # While 'smallest_index <= r', depending on the relationship between 'cdf[m]' and cutoff, 
+      # either add to 'smallest_index' or decrease from 'r'.
+      while (smallest_index <= r) 
+        
+        {
+        
+          m = as.integer((smallest_index + r) / 2)
     
+          if (cdf[m] < cutoff) {smallest_index = m + 1} 
+          
+          else {r = m - 1}  
+        
+        }
+      
+      return(smallest_index)
+      
+    }
     
+  # Create function to randomly sample the index from a probability distribution 
+  # according to the probabilities in the distribution.
+  # This function is the main output of this section.
+  # So for the probability distribution (0.3, 0.2, 0.5), the function below
+  # returns 1 30% of the time, 2 20% of the time, and 3 50% of the time.
+  sample_index = function(prob_dist) 
     
-
+    {
+    
+      # Compute the cumulative distribution function of 'prob_dist' using 'pdf_to_cdf' above.
+      cdf = pdf_to_cdf(as.array(prob_dist))
+      
+      # Randomly pick a value from the uniform distribution (0, 1).
+      random_value = runif(1)
+      
+      # Run 'search' function from above using the CDF just generated as the 'cdf' argument 
+      # and 'random_value' as cutoff. This results in the desired function behavior.
+      index = search(cdf, random_value)
+      
+      return(index)
+      
+    }
+    
 # PUT TEXT DATA INTO NUMERIC ARRAY ----------------------------------------
 # This section puts the text data into a numeric array.
 # The number of rows is the length of each string in a batch.
@@ -365,9 +381,6 @@ model = mx.lstm(train_list, val_list,
                  input.size = length(char_id_dict),
                  initializer = mx.init.uniform(0.1),
                  learning.rate = learning_rate)
-  
-  
-
     
 # GENERATE NEW TEXT BASED ON LSTM -----------------------------------------
 # This section generates new text based on the LSTM.
@@ -380,3 +393,35 @@ model = mx.lstm(train_list, val_list,
                                       num.embed = embedding_size,
                                       num.label = length(char_id_dict),
                                       arg.params = model$arg.params)
+  
+  # Pick random starting character and get numeric ID (but not 'other' character).
+  current_char_id = sample(1:(length(char_id_dict) - 1), 1)
+  
+  # Get actual starting character and start generated sentence.
+  generated_sentence = id_char_dict[[current_char_id]]
+  
+  # I have 1 character. Loop through to generate the rest.
+  for (i in 1:(char_to_generate - 1))
+    
+  {
+    
+    # Predict next character using 'model_inference'.
+    # I use 'current_char_id - 1' because I trained the model this way.
+    # See the "PUT TEXT DATA INTO NUMERIC ARRAY" section for more details.
+    forward_pred = mx.lstm.forward(model_inference, 
+                                   (current_char_id - 1))
+    
+    # Update 'model_inference'.
+    model_inference = forward_pred$model
+    
+    # One of the outputs of 'forward_pred' is a probability distribution over the next character.
+    # Sample this probability distribution using the 'sample_index' function above.
+    # Update 'current_char_id' with this sampled value.
+    current_char_id = sample_index(forward_pred$prob)
+    
+    # Add the corresponding character for 'current_char_id' to 'generated_sentence'.
+    generated_sentence = paste0(generated_sentence, id_char_dict[[current_char_id]])
+    
+  }
+  
+  print(generated_sentence)
