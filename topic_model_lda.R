@@ -7,6 +7,7 @@ library(dplyr)
 library(ldatuning)
 library(tm)
 library(topicmodels)
+library(tidytext)
 
 # IMPORT DATA -------------------------------------------------------------
 # Working directory must be set to the 'airline-tweets-nlp' repository folder.
@@ -14,19 +15,17 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
 
 # CLEAN TEXT --------------------------------------------------------------
 # This section removes unwanted symbols from the 'text' column.
+# Punctuation is removed later so I don't worry about it right now.
 
   # Remove unwanted characters from 'data$text'.
   # Note that I couldn't remove forward slashes.
   data$text = gsub('@', '', data$text)  # '@' signs
   data$text = gsub('$', '', data$text)  #  dollar signs
-  data$text = gsub(',', '', data$text)  # commas
   data$text = gsub(':', '', data$text)  # colons
   data$text = gsub(';', '', data$text)  # semi-colons
   data$text = gsub('-', '', data$text)  # dashes
   data$text = gsub('+', '', data$text)  # pluses
   data$text = gsub('#', '', data$text)  # number signs
-  data$text = gsub('?', '', data$text)  # question marks
-  data$text = gsub('!', '', data$text)  # exclamation marks
   data$text = gsub('\\.', '', data$text)  # periods
   data$text = gsub("'", "", data$text)  # apostrophes
   data$text = gsub('"', '', data$text)  # quotation marks
@@ -136,13 +135,28 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   # Conduct LDA (this takes ~15 seconds).
   lda = LDA(x = dtm, 
             k = topics, 
-            method = 'Gibbs')
+            method = 'Gibbs', 
+            control = list(seed = 20180109))
   
   # View the "top" 20 terms in each topic.
   terms(lda, 20)
   
   # View the breakdown of how many documents fall into each topic.
   table(topics(lda))
+  
+  # View the probability of each word for each topic.
+  # This command requires the 'tidytext' package.
+  head(tidy(lda, 
+            matrix = 'beta'))
+  
+  # Look at per document per topic probabilities.
+  # This command requires the 'tidytext' package.
+  head(tidy(lda, 
+            matrix = 'gamma'))
+  
+  # Get data table that shows the topic assignment of each WORD in each document...crazy.
+  head(data.table(augment(lda, 
+                          data = dtm)))
   
   # View probabilities of belonging to each topics per document.
   head(posterior(lda)$topics)
@@ -154,14 +168,14 @@ data = data.table(read_csv('Airline-Sentiment-2-w-AA.csv'))
   
     # Compare derived topic to 'airline_sentiment'.
     # Most tweets were negative, but...
-    # Topic 4 trends very negative.
-    # Topic 5 seems to be slightly less negative.
+    # Topics 4 and 5 seem less negative.
     table(data$topic_id, data$airline_sentiment)
     
     # Compare derived topic to 'negativereason' where it exists.
-    # Topic 1 got the majority of 'Damaged Luggage' and 'Lost Luggage'
-    # Topic 2 got the majority of 'Flight Booking Problems'
-    # Topic 3 got the majority of 'Late Flight'
-    # Topic 4 got the majority of 'Customer Service Issue'
+    # Topic 1 got the majority of 'Bad Flight', 'Flight Attendant Complaints', 'Late Flight',  and 'longlines' reviews.
+    # Topic 2 got the majority of 'Can't Tell' reviews.
+    # Topic 3 got the majority of 'Customer Service Issue' reviews.
+    # Topic 4 got the majority of 'Flight Booking Problems' reviews.
+    # Topic 5 got the majority of 'Damaged Luggage' and 'Lost Luggage' reviews.
     table(data$topic_id, data$negativereason)
   
