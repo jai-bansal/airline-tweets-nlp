@@ -1,4 +1,9 @@
 # This script builds a topic model using latent Dirichlet allocation (LDA).
+# I use the 'sklearn' module.
+# It's not as easy to use as the R version.
+# There's also another module (not included) called 'gensim'.
+# It was too involved to get something running in 'gensim' for the purposes
+# of this fast and easy script.
 
 ################
 # IMPORT MODULES
@@ -8,6 +13,7 @@
 # Import modules.
 import pandas as pd
 import nltk
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 
 #############
@@ -59,20 +65,29 @@ data.text.replace(regex = True, inplace = True, to_replace = '  ', value = ' ') 
 #nltk.download('stopwords')
 #nltk.download('punkt')
 
-# Tokenize words in 'data.text' (put words into list).
-data['tokenized_text'] = data.text.apply(nltk.word_tokenize)
+#####
+# LDA
+#####
 
-# Specify (English) stopwords.
-stop_words = set(nltk.corpus.stopwords.words('english'))
+# Create TF-IDF matrix object.
+tfidf = CountVectorizer(analyzer = 'word',
+                        strip_accents = 'unicode',
+                        stop_words = 'english',
+                        lowercase = True,
+                        max_df = 0.95,
+                        min_df = 5)
 
-# Create column in 'data' for cleaned, tokenized strings.
-data['clean_tokens'] = data.tokenized_text.apply(lambda x: [word for word in x if word not in stop_words])
-
-#############
-# CONDUCT LDA
-#############
+# Convert 'data.text' to TF-IDF matrix.
+data_tfidf = tfidf.fit_transform(data.text)
 
 # Create LDA object with 5 topics.
 lda = LDA(n_components = 5,
-          random_state = 20180122)
+          random_state = 20180122,
+          learning_method = 'batch',
+          verbose = 5)
 
+# Fit LDA model.
+lda.fit(data_tfidf)
+
+# View topic pseudo-counts for each word.
+lda.components_
